@@ -1,3 +1,10 @@
+import sys
+import os
+
+print("--- PYTHON ENVIRONMENT DIAGNOSTICS ---")
+print(f"Running from: {sys.executable}")
+print("--- END DIAGNOSTICS ---\n")
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
@@ -266,6 +273,52 @@ class RFIDTagMonitor:
     def open_racer_manager(self):
         """Open the racer manager window"""
         self.racer_manager.show()  
+
+    # In your RFIDTagMonitor class (Source 6)
+
+    # ... (other methods like open_racer_manager) ...
+
+    def update_selected_racers(self, selected_racers_list):
+        """
+        Receives the list of selected racers from the RacerManager,
+        updates the shared state, and refreshes the race setup UI.
+        """
+        logger.info(f"Applying {len(selected_racers_list)} racers to the race.")
+        
+        # Clear previous race data
+        shared_state.ALLOWED_TAGS = []
+        shared_state.racers_data = {}
+
+        # Populate the shared state with the new selection
+        for racer in selected_racers_list:
+            # Normalize the tag for consistency
+            tag = str(racer.get('tag', '')).strip().lower()
+            if not tag:
+                continue
+
+            shared_state.ALLOWED_TAGS.append(tag)
+            
+            # Initialize the racer's data for the upcoming race
+            shared_state.racers_data[tag] = {
+                "name": f"{racer.get('first_name', '')} {racer.get('last_name', '')}",
+                "laps": 0,
+                "lap_times": [],
+                "finished": False,
+                "position": 0,
+                "finish_time": 0
+            }
+        
+        # Update the main UI label to reflect the selection
+        self.update_race_setup(len(shared_state.ALLOWED_TAGS))
+        
+        messagebox.showinfo("Racers Applied", 
+                            f"{len(shared_state.ALLOWED_TAGS)} racers have been applied to the race.")
+
+    # ... (other methods like update_race_setup) ...
+
+
+
+
 
     def update_race_setup(self, num_racers):
         """Update the race setup display"""
