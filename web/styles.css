@@ -1,0 +1,177 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f4f4f4;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+header {
+    background-color: #2c3e50;
+    color: #fff;
+    padding: 20px;
+    text-align: center;
+}
+
+h1 {
+    margin-bottom: 20px;
+}
+
+.race-timer {
+    font-size: 3rem;
+    font-weight: bold;
+    margin: 10px 0;
+    font-family: monospace;
+}
+
+.race-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 10px 0;
+}
+
+.status-indicator {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background-color: #e74c3c; /* Red for inactive */
+    margin-right: 10px;
+}
+
+.status-indicator.active {
+    background-color: #2ecc71; /* Green for active */
+}
+
+.tabs {
+    display: flex;
+    background-color: #34495e;
+}
+
+.tab-button {
+    background-color: transparent;
+    border: none;
+    color: #fff;
+    padding: 15px 20px;
+    cursor: pointer;
+    flex: 1;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+}
+
+.tab-button:hover {
+    background-color: #2c3e50;
+}
+
+.tab-button.active {
+    background-color: #2c3e50;
+    border-bottom: 3px solid #3498db;
+}
+
+.tab-content {
+    display: none;
+    padding: 20px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.results-table th,
+.results-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.results-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.results-table tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background-color: #2c3e50;
+    color: #fff;
+    font-size: 0.8rem;
+}
+
+#refresh-status {
+    font-style: italic;
+}
+/* Updated table style*/
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+table {
+    width: 100%;              /* Make table use full container width */
+    border-collapse: separate; /* Allow spacing between cells */
+    border-spacing: 8px;      /* Add space between columns */
+    margin: 20px 0;           /* Add some margin around the table */
+}
+
+th, td {
+    padding: 12px 16px;       /* Add padding inside cells */
+    font-size: 1.1rem;        /* Increase text size */
+}
+
+th {
+    font-size: 1.2rem;        /* Larger text for headers */
+    font-weight: 700;         /* Make headers bold */
+    background-color: #34495e; /* Match the blue theme */
+    color: white;             /* White text for headers */
+}
+
+/* Add alternating row colors */
+tr:nth-child(even) {
+    background-color: #f5f7fa; /* Light grey for even rows */
+}
+
+/* Add hover effect for better interaction */
+tbody tr:hover {
+    background-color: #edf2f7;
+}
+
+/* Ensure text alignment */
+td, th {
+    text-align: left;
+    vertical-align: middle;
+}
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .race-timer {
+        font-size: 2rem;
+    }
+    
+    .results-table th,
+    .results-table td {
+        padding: 8px;
+    }
+}
