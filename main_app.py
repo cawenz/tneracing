@@ -39,7 +39,7 @@ class RFIDTagMonitor:
     def setup_ui(self):
         # Setup the user interface without redundant Race Results boxes"""
         self.root.title("RFID Race Timer")  
-        self.root.geometry("800x600")  
+        self.root.geometry("800x600")
     
         main_frame = ttk.Frame(self.root, padding=10)  
         main_frame.pack(fill=tk.BOTH, expand=True)  
@@ -139,18 +139,21 @@ class RFIDTagMonitor:
         # Standings tab
         standings_frame = ttk.Frame(self.results_notebook)
         self.results_notebook.add(standings_frame, text="Standings")
-    
-        # Standings tree with scrollbar
-        self.standings_tree = ttk.Treeview(standings_frame, columns=("position", "name", "laps", "time"), show="headings")
-        self.standings_tree.heading("position", text="Pos")
-        self.standings_tree.heading("name", text="Racer")
+
+        self.standings_tree = ttk.Treeview(standings_frame, 
+                                   columns=("position", "racer", "laps", "time"), 
+                                   show="headings")
+        self.standings_tree.heading("position", text="Position")
+        self.standings_tree.heading("racer", text="Racer")
         self.standings_tree.heading("laps", text="Laps")
-        self.standings_tree.heading("time", text="Finish Time")
-    
-        self.standings_tree.column("position", width=50)
-        self.standings_tree.column("name", width=200)
-        self.standings_tree.column("laps", width=50)
-        self.standings_tree.column("time", width=100)
+        self.standings_tree.heading("time", text="Time") # This now shows last lap's total time
+
+        self.standings_tree.column("position", width=80)
+        self.standings_tree.column("racer", width=250)
+        self.standings_tree.column("laps", width=80)
+        self.standings_tree.column("time", width=120)
+
+# ... (rest of the setup)
     
         results_scrollbar = ttk.Scrollbar(standings_frame, orient="vertical", command=self.standings_tree.yview)
         self.standings_tree.configure(yscrollcommand=results_scrollbar.set)
@@ -514,64 +517,65 @@ class RFIDTagMonitor:
         except:
             pass
 
-    def update_results(self):
-    # Update the race results display with the latest data
-        try:
-        # Clear existing entries in both trees
-            for item in self.lap_times_tree.get_children():
-                self.lap_times_tree.delete(item)
+    # In your RFIDTagMonitor class (likely from Source 6)
+
+def update_results(self):
+    """
+    Update the race results display with the latest data, showing a live
+    leaderboard based on current laps and times.
+    """
+    try:
+        # Clear existing entries in the standings tree
+        for item in self.standings_tree.get_children():
+            self.standings_tree.delete(item)
+
+        # Separate racers who have started from those who haven't.
+        # This prevents errors and makes sorting easier.
+        racers_in_progress = []
+        racers_not_started = []
+        for tag, racer in shared_state.racers_data.items():
+            if racer.get("laps", 0) > 0:
+                racers_in_progress.append(racer)
+            else:
+                racers_not_started.append(racer)
+
+        # --- THIS IS THE NEW SORTING LOGIC FOR LIVE STANDINGS ---
+        # 1. Sort by number of laps in DESCENDING order (more laps is better).
+        # 2. For racers with the same number of laps, sort by their last lap's
+        #    total time in ASCENDING order (the racer who got there first is ahead).
+        racers_in_progress.sort(key=lambda r: (-r['laps'], r['lap_times'][-1]))
+
+        # --- Populate the Standings Tree with Live Positions ---
         
-            for item in self.standings_tree.get_children():
-                self.standings_tree.delete(item)
-        
-        # Sort racers for standings
-            sorted_racers = []
-            for tag, racer in shared_state.racers_data.items():
-                if racer["laps"] > 0:  # Only include racers who have started
-                    sorted_racers.append(racer)
-        
-        # Sort by position (finished racers first), then by laps (descending)
-            sorted_racers.sort(key=lambda x: (
-                0 if x["position"] > 0 else 1,  # Finished racers first
-                -x["position"] if x["position"] > 0 else 0,  # Sort by position (ascending)
-                -x["laps"],  # Then by laps (descending)
-                x["finish_time"] if x["finished"] else float('inf')  # Then by finish time
+        # Add the currently ranked racers
+        for i, racer in enumerate(racers_in_progress):
+            current_position = i + 1
+            
+            # The time displayed is the total elapsed time of their last completed lap
+            last_lap_time = racer['lap_times'][-1]
+            time_str = self.race_timer.format_time(last_lap_time)
+
+            self.standings_tree.insert("", tk.END, values=(
+                current_position,
+                racer["name"],
+                racer["laps"],
+                time_str
             ))
         
-        # Update standings tree
-            for racer in sorted_racers:
-                position = str(racer["position"]) if racer["position"] > 0 else "-"
-                time_str = self.race_timer.format_time(racer["finish_time"]) if racer["finished"] else "-"
+        # Add the racers who haven't started yet at the bottom of the list
+        for racer in racers_not_started:
+            self.standings_tree.insert("", tk.END, values=(
+                "-",
+                racer["name"],
+                0,
+                "-"
+            ))
             
-                self.standings_tree.insert("", tk.END, values=(
-                    position,
-                    racer["name"],
-                    racer["laps"],
-                    time_str
-             ))
-        
-        # Update lap times tree
-            for tag, racer in shared_state.racers_data.items():
-                if racer["laps"] == 0:
-                    continue
-            
-                for i, lap_time in enumerate(racer["lap_times"]):
-                    lap_num = i + 1
-                    total_time = lap_time
-                    lap_duration = lap_time
-                
-                if i > 0:
-                    lap_duration = lap_time - racer["lap_times"][i-1]
-                
-                self.lap_times_tree.insert("", tk.END, values=(
-                    racer["name"],
-                    lap_num,
-                    self.race_timer.format_time(lap_duration),
-                    self.race_timer.format_time(total_time)
-                ))
-        
-        except Exception as e:
-            logger.error(f"Error updating results display: {e}", exc_info=True)
+        # The lap times tree can still be updated as before (no changes needed there)
+        # (If you have logic here for the lap times tab, it can remain)
+
+    except Exception as e:
+        logger.error(f"Failed to update results display: {e}", exc_info=True)
 
         # If we have a web server running, update it with latest data
         if hasattr(self, 'web_server_running') and self.web_server_running:

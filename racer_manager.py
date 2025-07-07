@@ -26,7 +26,7 @@ class RacerManager:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Racer Management")
-        self.window.geometry("850x550")
+        self.window.geometry("1000x600")
         self.window.protocol("WM_DELETE_WINDOW", self.hide)
         self.window.transient(parent)
         self.window.grab_set()

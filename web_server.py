@@ -32,28 +32,41 @@ class RaceDataHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         """Handle GET requests"""
         # API endpoint for race data
+        # In web_server.py (Source 2), inside the RaceDataHandler class
+
+# Find the do_GET method and modify the /api/race-data section like this:
+
         if self.path == '/api/race-data':
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
-            self.send_header('Cache-Control', 'no-cache')
             self.end_headers()
             
-            # Calculate time elapsed
-            elapsed = 0
-            if shared_state.race_start_time > 0 and shared_state.race_active:
-                elapsed = time.time() - shared_state.race_start_time
+            # --- NEW LOGIC START: Live sorting for the web API ---
             
-            # Prepare data for the frontend
+            # Prepare the list of racers for sorting
+            all_racers = list(shared_state.racers_data.values())
+            
+            racers_in_progress = [r for r in all_racers if r.get("laps", 0) > 0]
+            racers_not_started = [r for r in all_racers if r.get("laps", 0) == 0]
+
+            # Sort racers in progress by laps (desc) and then by time (asc)
+            racers_in_progress.sort(key=lambda r: (-r['laps'], r['lap_times'][-1]))
+            
+            # Combine the sorted lists
+            sorted_racers = racers_in_progress + racers_not_started
+
+            # Build the JSON response with live positions
             race_data = {
                 'active': shared_state.race_active,
-                'elapsed': elapsed,
-                'elapsed_formatted': self.format_time(elapsed),
-                'num_laps': shared_state.num_laps,
+                'elapsed': time.time() - shared_state.race_start_time if shared_state.race_active else 0,
+                'elapsed_formatted': self.format_time(time.time() - shared_state.race_start_time if shared_state.race_active else 0),
                 'racers': []
             }
-            
-            # Process racer data
-            for tag, racer in shared_state.racers_data.items():
+
+            for i, racer in enumerate(sorted_racers):
+                # Calculate live position for racers in progress
+                live_position = i + 1 if racer in racers_in_progress else "-"
+                
                 # Format lap times
                 formatted_lap_times = []
                 for lap_time in racer.get('lap_times', []):
@@ -62,12 +75,12 @@ class RaceDataHandler(http.server.SimpleHTTPRequestHandler):
                         'formatted': self.format_time(lap_time)
                     })
                 
-                # Add racer to response
+                # Add racer to response with the live position
                 race_data['racers'].append({
-                    'id': tag,
+                    'id': racer.get('tag'), # Assuming tag is the ID for the web view
                     'name': racer.get('name', 'Unknown'),
                     'laps': racer.get('laps', 0),
-                    'position': racer.get('position', 0),
+                    'position': live_position,  # <-- Using the new live position
                     'finished': racer.get('finished', False),
                     'finish_time': racer.get('finish_time', 0),
                     'finish_time_formatted': self.format_time(racer.get('finish_time', 0)),
