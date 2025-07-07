@@ -11,4 +11,4 @@ logger = logging.getLogger('rfid_race_timer')
 READER_IP = '192.168.8.237' # Replace with the reader's correct IP address
 READER_PORT = 5084 
 DELAY_SECONDS = 5 # Minimum time between readings of the same tag
-DEFAULT_NUM_LAPS = 10 # Default number of laps
+DEFAULT_NUM_LAPS = 3 # Default number of laps
