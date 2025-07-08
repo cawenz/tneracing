@@ -18,8 +18,6 @@ from rfid_reader import start_rfid_reader, disconnect_rfid_reader, set_monitor_r
 from data_exporter import RaceResultsExporter # Import RaceResultsExporter class  
 from web_server import start_server, stop_server, get_server_url
 
-
-
 class RFIDTagMonitor:
     def __init__(self, root):
         self.root = root
@@ -31,8 +29,6 @@ class RFIDTagMonitor:
         # Set the reference to this monitor instance for the RFID reader module
         set_monitor_reference(self)
         self.web_server_running = False
-        self.update_results_interval = 1000  # Update every 1 second
-        self.update_results()
 
         # Setup the user interface
         self.setup_ui()
@@ -144,18 +140,24 @@ class RFIDTagMonitor:
         standings_frame = ttk.Frame(self.results_notebook)
         self.results_notebook.add(standings_frame, text="Standings")
 
+        
+
+
         self.standings_tree = ttk.Treeview(standings_frame, 
-                                   columns=("position", "racer", "laps", "time"), 
+                                   columns=("position", "racer", "laps", "gap", "best_lap_time", "last_lap_time", "total_time"), 
                                    show="headings")
+        self.standings_tree["columns"] = ("position", "racer", "laps", "gap", "best_lap_time", "last_lap_time", "total_time")
+        self.standings_tree.column("#0", width=0, stretch=tk.NO)
+        for column in self.standings_tree["columns"]:
+            self.standings_tree.column(column, anchor=tk.W, width=100)
+            self.standings_tree.heading(column, text=column.capitalize().replace("_", " "))
         self.standings_tree.heading("position", text="Position")
         self.standings_tree.heading("racer", text="Racer")
-        self.standings_tree.heading("laps", text="Laps")
-        self.standings_tree.heading("time", text="Time") # This now shows last lap's total time
-
-        self.standings_tree.column("position", width=80)
-        self.standings_tree.column("racer", width=250)
-        self.standings_tree.column("laps", width=80)
-        self.standings_tree.column("time", width=120)
+        self.standings_tree.heading("laps", text="Total Laps Recorded")
+        self.standings_tree.heading("gap", text="Gap")
+        self.standings_tree.heading("best_lap_time", text="Best Lap Time")
+        self.standings_tree.heading("last_lap_time", text="Last Lap Time")
+        self.standings_tree.heading("total_time", text="Total Time")
 
 # ... (rest of the setup)
     
@@ -379,11 +381,12 @@ class RFIDTagMonitor:
         self.stop_button.config(state=tk.DISABLED)  
         self.racer_mgr_button.config(state=tk.NORMAL)  
         self.update_status("Race stopped")  
-        self.show_race_results()  
+        #self.show_race_results()
+        self.update_results()
         self.results_exporter.prompt_export_results() # Call method from the exporter instance  
 
-    def show_race_results(self):
-        """Display race results"""
+    """ def show_race_results(self):
+
         sorted_racers = []  
         for tag, data in shared_state.racers_data.items():   # Use shared_state
             sorted_racers.append(data)
@@ -403,7 +406,7 @@ class RFIDTagMonitor:
             time_str = self.race_timer.format_time(racer["finish_time"]) if racer["finish_time"] > 0 else "-"  
             self.standings_tree.insert("", tk.END, values=(
                 position_str, racer["name"], racer["laps"], time_str
-            ))  
+            ))   """
 
     def process_tag_reading(self, tag_id, antenna, rssi, timestamp):
     # Skip processing if race is not active
@@ -526,14 +529,11 @@ class RFIDTagMonitor:
     def update_results(self):
         if not shared_state.race_active or not shared_state.racers_data:
             return
+
         try:
             # Clear existing entries in the standings tree
             for item in self.standings_tree.get_children():
                 self.standings_tree.delete(item)
-
-            # Clear existing entries in the lap times tree
-            for item in self.lap_times_tree.get_children():
-                self.lap_times_tree.delete(item)
 
             # Separate racers who have started from those who haven't.
             # This prevents errors and makes sorting easier.
@@ -556,20 +556,66 @@ class RFIDTagMonitor:
 
             # --- Populate the Standings Tree with Live Positions ---
             
-            # Add the currently ranked racers
-            for i, racer in enumerate(racers_in_progress):
-                current_position = i + 1
-                
-                # The time displayed is the total elapsed time of their last completed lap
-                last_lap_time = racer['lap_times'][-1]
-                time_str = self.race_timer.format_time(last_lap_time)
+            # Check if the race is finished
+            if all(r['finished'] for r in racers_in_progress):
+                # If the race is finished, calculate the final standings
+                final_standings = sorted(racers_in_progress, key=lambda r: (r['position'], r['finish_time']))
 
-                self.standings_tree.insert("", tk.END, values=(
-                    current_position,
-                    racer["name"],
-                    racer["laps"],
-                    time_str
-                ))
+                # Update the standings tree with the final standings
+                for i, racer in enumerate(final_standings):
+                    current_position = racer['position']
+
+                    # Calculate gap to first place racer
+                    gap = self.race_timer.format_time(racer['finish_time'] - final_standings[0]['finish_time']) if current_position > 1 else "-"
+
+                    # Calculate best lap time
+                    best_lap_time = self.race_timer.format_time(min(racer['lap_times']))
+
+                    # Calculate last lap time
+                    last_lap_time = self.race_timer.format_time(racer['lap_times'][-1])
+
+                    # Calculate total time
+                    total_time = self.race_timer.format_time(racer['finish_time'])
+
+                    self.standings_tree.insert("", tk.END, values=(
+                        current_position,
+                        racer["name"],
+                        racer["laps"],
+                        gap,
+                        best_lap_time,
+                        last_lap_time,
+                        total_time
+                    ))
+            else:
+                # If the race is not finished, update the standings tree with the live positions
+                for i, racer in enumerate(racers_in_progress):
+                    current_position = i + 1
+                    
+                    # Calculate gap to first place racer
+                    if current_position > 1:
+                        first_place_racer = racers_in_progress[0]
+                        gap = self.race_timer.format_time(racer['lap_times'][-1] - first_place_racer['lap_times'][-1])
+                    else:
+                        gap = "-"
+
+                    # Calculate best lap time
+                    best_lap_time = self.race_timer.format_time(min(racer['lap_times']))
+
+                    # Calculate last lap time
+                    last_lap_time = self.race_timer.format_time(racer['lap_times'][-1])
+
+                    # Calculate total time
+                    total_time = self.race_timer.format_time(sum(racer['lap_times']))
+
+                    self.standings_tree.insert("", tk.END, values=(
+                        current_position,
+                        racer["name"],
+                        racer["laps"],
+                        gap,
+                        best_lap_time,
+                        last_lap_time,
+                        total_time
+                    ))
             
             # Add the racers who haven't started yet at the bottom of the list
             for racer in racers_not_started:
@@ -577,42 +623,17 @@ class RFIDTagMonitor:
                     "-",
                     racer["name"],
                     0,
+                    "-",
+                    "-",
+                    "-",
                     "-"
                 ))
-                
-            # --- Populate the Lap Times Tree with Lap Times ---
-            
-            # Add lap times for each racer
-            for racer in racers_in_progress:
-                for i, lap_time in enumerate(racer['lap_times']):
-                    lap_num = i + 1
-                    
-                    # Calculate individual lap duration
-                    if i == 0:
-                        individual_lap_duration = lap_time
-                    else:
-                        individual_lap_duration = lap_time - racer['lap_times'][i-1]
-                    
-                    # Format times for output
-                    formatted_lap_duration = self.race_timer.format_time(individual_lap_duration)
-                    formatted_total_elapsed_time = self.race_timer.format_time(lap_time)
-
-                    self.lap_times_tree.insert("", tk.END, values=(
-                        racer["name"],
-                        lap_num,
-                        formatted_lap_duration,
-                        formatted_total_elapsed_time
-                    ))
 
         except Exception as e:
             logger.error(f"Failed to update results display: {e}", exc_info=True)
 
         finally:
             self.root.after(1000, self.update_results)
-
-            # If we have a web server running, update it with latest data
-            if hasattr(self, 'web_server_running') and self.web_server_running:
-                    self.update_web_data()
 
 if __name__ == "__main__":
     try:
