@@ -20,7 +20,7 @@ def process_tag_data(tag_data):
         if not epc_data:
             logger.warning("No EPC data in tag")
             return
-
+        
         if isinstance(epc_data, bytes):
             tag_id_hex = epc_data.hex().lower()
             try:
@@ -32,10 +32,10 @@ def process_tag_data(tag_data):
                 tag_id = tag_id_hex
         else:
             tag_id = str(epc_data).lower()
-
+        
         # After tag_id is extracted
         logger.info(f"Extracted tag_id: {tag_id}, race_active: {shared_state.race_active}, in allowed tags: {tag_id in shared_state.ALLOWED_TAGS}")
-
+        
         # This is the key part that directly processes the tag like in the original code
         if shared_state.race_active and (not shared_state.ALLOWED_TAGS or tag_id in shared_state.ALLOWED_TAGS):
             current_time = time.time()
@@ -43,7 +43,7 @@ def process_tag_data(tag_data):
                (current_time - shared_state.last_read_times[tag_id] < shared_state.DELAY_SECONDS):
                 logger.debug(f"Ignoring tag: {tag_id} (too soon since last read)")
                 return
-
+            
             shared_state.last_read_times[tag_id] = current_time
             antenna = tag_data.get('AntennaID', 0)
             rssi = tag_data.get('PeakRSSI', 0)
@@ -54,38 +54,78 @@ def process_tag_data(tag_data):
                 racer = shared_state.racers_data[tag_id]
                 lap_time = current_time - shared_state.race_start_time
                 
-                # Update lap information
-                racer["lap_times"].append(lap_time)
-                racer["laps"] += 1
-                logger.info(f"Racer {racer['name']} completed lap {racer['laps']} in {lap_time:.2f}s")
+                # Track if this is the first lap for this racer
+                first_lap_for_racer = racer.get("laps", 0) == 0
                 
-                # Check if race is finished
-                if racer["laps"] >= shared_state.num_laps and not racer["finished"]:
-                    racer["finished"] = True
-                    racer["finish_time"] = lap_time
+                # FIXED: Check if racer has already completed the required laps
+                if racer["laps"] < shared_state.num_laps:
+                    # Update lap information
+                    racer["lap_times"].append(lap_time)
+                    racer["laps"] += 1
+                    logger.info(f"Racer {racer['name']} completed lap {racer['laps']} in {lap_time:.2f}s")
                     
-                    # Calculate position
-                    position = 1
-                    for r in shared_state.racers_data.values():
-                        if r["finished"] and r != racer:
-                            position += 1
-                    racer["position"] = position
-                    logger.info(f"Racer {racer['name']} finished in position {position}")
+                    # Check if racer finished the race
+                    if racer["laps"] >= shared_state.num_laps and not racer["finished"]:
+                        racer["finished"] = True
+                        racer["finish_time"] = lap_time
+                        
+                        # Calculate position
+                        position = 1
+                        for r in shared_state.racers_data.values():
+                            if r["finished"] and r != racer:
+                                position += 1
+                        racer["position"] = position
+                        logger.info(f"Racer {racer['name']} finished in position {position}")
+                else:
+                    # Racer has already completed the required number of laps
+                    logger.debug(f"Ignoring lap for {racer['name']} - already completed {shared_state.num_laps} laps")
                 
-                # Now update the UI via the monitor (this part still needs the tkinter after)
+                # Now update the UI via the monitor
                 if hasattr(_monitor_ref, 'update_results'):
-                         _monitor_ref.root.after(0, _monitor_ref.update_results)
+                    _monitor_ref.root.after(0, _monitor_ref.update_results)
                 elif hasattr(_monitor_ref, 'update_results_display'):
-                        _monitor_ref.root.after(0, _monitor_ref.update_results_display)
+                    _monitor_ref.root.after(0, _monitor_ref.update_results_display)
                 else:
                     logger.error("Monitor has no method to update results!")
                 
-                # Check if all racers finished
-                all_finished = all(r["finished"] for r in shared_state.racers_data.values() if r["laps"] > 0)
-                if all_finished and shared_state.race_active:
-                    logger.info("All racers have finished the race")
-                    if _monitor_ref and _monitor_ref.root.winfo_exists():
-                        _monitor_ref.root.after(0, _monitor_ref.stop_race)
+                # COMPLETELY REVISED LOGIC FOR RACE ENDING:
+                # 1. If this racer just started their first lap, definitely don't end the race
+                # 2. Check if any racers have 0 laps - if so, continue the race
+                # 3. If all racers have started, check if all have finished their required laps
+                
+                # If this was the first lap for this racer, don't check for race ending
+                if first_lap_for_racer:
+                    logger.info(f"Racer {racer['name']} just started - race continues")
+                else:
+                    # Check if there are still racers who haven't started
+                    any_racers_not_started = False
+                    for tag in shared_state.ALLOWED_TAGS:
+                        if tag in shared_state.racers_data:
+                            r = shared_state.racers_data[tag]
+                            if r.get("laps", 0) == 0:
+                                any_racers_not_started = True
+                                logger.debug(f"Racer {r.get('name', 'Unknown')} has not started yet")
+                                break
+                    
+                    # If there are racers who haven't started, don't end the race
+                    if any_racers_not_started:
+                        logger.info("Some racers haven't started yet - race continues")
+                    else:
+                        # All racers have started, check if ALL have finished their required laps
+                        all_racers_finished = True
+                        for tag in shared_state.ALLOWED_TAGS:
+                            if tag in shared_state.racers_data:
+                                r = shared_state.racers_data[tag]
+                                # A racer is not finished if they haven't completed all required laps
+                                if r.get("laps", 0) < shared_state.num_laps:
+                                    all_racers_finished = False
+                                    logger.debug(f"Racer {r.get('name', 'Unknown')} has not finished all laps")
+                                    break
+                        
+                        if all_racers_finished and shared_state.race_active:
+                            logger.info("All racers have completed all required laps - ending race")
+                            if _monitor_ref and _monitor_ref.root.winfo_exists():
+                                _monitor_ref.root.after(0, _monitor_ref.stop_race)
         else:
             logger.debug(f"Ignoring tag: {tag_id} (not in allowed list or race not active)")
     except Exception as e:
