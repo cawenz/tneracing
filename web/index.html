@@ -16,30 +16,31 @@
             </div>
             <div id="race-timer" class="race-timer">0:00:00.000</div>
         </header>
-
         <div class="tabs">
             <button class="tab-button active" data-tab="standings">Current Standings</button>
             <button class="tab-button" data-tab="lap-times">Lap Times</button>
         </div>
-
         <main>
             <div id="standings" class="tab-content active">
-                <h2>Current Standings</h2>
-                <table>
+                <table class="results-table">
                     <thead>
                         <tr>
                             <th>Position</th>
-                            <th>Racer Name</th>
-                            <th>Laps Completed</th>
-                            <th>Finish Time</th>
+                            <th>Racer</th>
+                            <th>Laps</th>
+                            <th>Gap</th>
+                            <th>Best Lap</th>
+                            <th>Last Lap</th>
+                            <th>Total Time</th>
                         </tr>
                     </thead>
                     <tbody id="standings-body">
-                        <!-- Standings rows will be populated by script.js -->
+                        <tr>
+                            <td colspan="7">Waiting for race data...</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
-
             <div id="lap-times" class="tab-content">
                 <h2>Lap Times</h2>
                 <table>

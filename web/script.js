@@ -31,59 +31,97 @@ function updateTimer(elapsedFormatted) {
 function updateStandings(racers) {
     standingsBody.innerHTML = '';
     if (!racers || racers.length === 0) {
-        standingsBody.innerHTML = '<tr><td colspan="4">No racers in the race.</td></tr>';
+        standingsBody.innerHTML = '<tr><td colspan="7">No racers in the race.</td></tr>';
         return;
     }
-    // Sort racers by position, handling cases where position might be 0 or undefined
-    racers.sort((a, b) => {
-        const posA = a.position > 0 ? a.position : Infinity;
-        const posB = b.position > 0 ? b.position : Infinity;
-        if (posA === posB) { // If positions are same, sort by laps (more laps is better)
-            return (b.laps || 0) - (a.laps || 0);
-        }
-        return posA - posB;
+    
+    // Add each racer to the table
+    racers.forEach(racer => {
+        const row = document.createElement('tr');
+        
+        // Extract position (could be a number or a string)
+        //const position = racer.position > 0 ? racer.position : '-';
+        
+        // Use data directly from the server's formatted strings
+        // This avoids JavaScript formatting inconsistencies
+        //const gap = racer.gap || '-';
+        //const bestLap = racer.best_lap || '-';
+        //const lastLap = racer.last_lap || '-';
+        //const totalTime = racer.finish_time_formatted || '-';
+        
+          row.innerHTML = `
+            <td>${racer.position > 0 ? racer.position : '-'}</td>
+            <td>${racer.name}</td>
+            <td>${racer.laps}</td>
+            <td>${racer.gap || '-'}</td>
+            <td>${racer.best_lap || '-'}</td>
+            <td>${racer.last_lap || '-'}</td>
+            <td>${racer.finish_time_formatted || '-'}</td>
+        `;
+        
+        standingsBody.appendChild(row);
     });
-
-racers.forEach(racer => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>${racer.position > 0 ? racer.position : '-'}</td>
-        <td>${racer.name || 'N/A'}</td>
-        <td>${racer.laps || 0}</td>
-        <td>${racer.finish_time && racer.finish_time > 0 ? 
-            formatTimeNoHours(racer.finish_time) : 
-            (racer.laps > 0 && raceTimer.textContent !== '0:00:00.000' ? 'Running' : '-')}</td>
-    `;
-    standingsBody.appendChild(row);
-});
 }
-
 function updateLapTimes(data) {
     lapTimesBody.innerHTML = '';
     let hasLapData = false;
-
-    if (data.racers && data.racers.length > 0) {
+    
+    // First check if we have the new dedicated lap_times array
+    if (data.lap_times && data.lap_times.length > 0) {
+        hasLapData = true;
+        
+        // Sort lap times: most recent laps first, then by elapsed time
+        const sortedLapTimes = [...data.lap_times].sort((a, b) => {
+            if (a.lap_number !== b.lap_number) {
+                return b.lap_number - a.lap_number; // Most recent laps first
+            }
+            return a.total_time - b.total_time; // Faster times first for same lap
+        });
+        
+        // Display the lap times
+        sortedLapTimes.forEach(lap => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${lap.racer_name}</td>
+                <td>${lap.lap_number}</td>
+                <td>${lap.lap_time_formatted}</td>
+                <td>${lap.total_time_formatted}</td>
+            `;
+            lapTimesBody.appendChild(row);
+        });
+    }
+    // Fall back to the original method if lap_times array isn't available
+    else if (data.racers && data.racers.length > 0) {
         let allLapEvents = [];
         data.racers.forEach(racer => {
             if (racer.lap_times && racer.lap_times.length > 0) {
                 hasLapData = true;
                 let previousTime = 0; // Track previous lap's cumulative time
                 racer.lap_times.forEach((lap, index) => {
+                    // Handle both old and new data structures
+                    const lapRaw = typeof lap === 'object' ? lap.raw : lap;
+                    const lapFormatted = typeof lap === 'object' ? lap.formatted : formatTimeNoHours(lap);
+                    
                     allLapEvents.push({
                         racerName: racer.name || 'N/A',
                         lapNumber: index + 1,
-                        cumulativeTimeRaw: lap.raw, // Make sure this is a number
-                        cumulativeTimeFormatted: lap.formatted,
+                        cumulativeTimeRaw: lapRaw, // Make sure this is a number
+                        cumulativeTimeFormatted: lapFormatted,
                         previousCumulativeTimeRaw: previousTime
                     });
-                    previousTime = lap.raw; // Update previous time for next lap
+                    previousTime = lapRaw; // Update previous time for next lap
                 });
             }
         });
-
-        // Sort all lap events by cumulative time
-        allLapEvents.sort((a, b) => b.cumulativeTimeRaw - a.cumulativeTimeRaw);
-
+        
+        // Sort all lap events by lap number (descending) then by cumulative time (ascending)
+        allLapEvents.sort((a, b) => {
+            if (a.lapNumber !== b.lapNumber) {
+                return b.lapNumber - a.lapNumber; // Higher lap numbers first
+            }
+            return a.cumulativeTimeRaw - b.cumulativeTimeRaw; // Faster times first for same lap
+        });
+        
         allLapEvents.forEach(event => {
             const individualLapTime = event.cumulativeTimeRaw - event.previousCumulativeTimeRaw;
             const row = document.createElement('tr');
@@ -96,10 +134,16 @@ function updateLapTimes(data) {
             lapTimesBody.appendChild(row);
         });
     }
-
+    
+    // Display "No lap times" message if no data was found
     if (!hasLapData) {
         lapTimesBody.innerHTML = '<tr><td colspan="4">No lap times recorded yet.</td></tr>';
     }
+    
+    // Log lap data for debugging
+    console.log("Lap data available:", hasLapData);
+    if (data.lap_times) console.log("Dedicated lap_times array length:", data.lap_times.length);
+    if (data.racers) console.log("Racers array length:", data.racers.length);
 }
 // Format time with hours for the main race timer
 function formatTime(seconds) {
@@ -124,7 +168,14 @@ function formatLapTime(seconds) {
     return seconds.toFixed(3);
 }
 
-function fetchRaceData() {
+function formatTotalTime(seconds) {
+    if (typeof seconds !== 'number' || seconds <= 0) return '-';
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${secs.toFixed(3).padStart(6, '0')}`;
+}
+
+/*function fetchRaceData() {
     fetch('/api/race-data')
         .then(response => {
             if (!response.ok) {
@@ -141,6 +192,53 @@ function fetchRaceData() {
         .catch(error => {
             console.error('Error fetching race data:', error);
             raceStatus.textContent = 'Error fetching data. Check console.';
+        });
+}*/
+
+// Add this to your script.js for debugging
+function fetchRaceData() {
+    console.log("Fetching race data...");
+    fetch('/api/race-data')
+        .then(response => {
+            console.log("Response received:", response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log("Data received:", data);
+            
+            // Debug racer information
+            if (data.racers && data.racers.length > 0) {
+                console.log("First racer:", data.racers[0]);
+                console.log("Gap:", data.racers[0].gap);
+                console.log("Best lap:", data.racers[0].best_lap);
+                console.log("Last lap:", data.racers[0].last_lap);
+            }
+            
+            // Debug lap times information
+            console.log("Number of lap times:", data.lap_times ? data.lap_times.length : 0);
+            if (data.lap_times && data.lap_times.length > 0) {
+                console.log("First lap time entry:", data.lap_times[0]);
+            } else {
+                console.log("No lap times data found in response");
+            }
+            
+            // Update the UI components
+            updateStatus(data.active);
+            updateTimer(data.elapsed_formatted);
+            updateStandings(data.racers);
+            
+            // Pass the complete data object to updateLapTimes
+            updateLapTimes(data);
+        })
+        .catch(error => {
+            console.error("Error fetching race data:", error);
+            
+            // Try to provide more detailed error information
+            if (error instanceof SyntaxError) {
+                console.error("Invalid JSON response from server. Check server logs for errors.");
+            } else if (error instanceof TypeError) {
+                console.error("Network error or server unreachable.");
+            }
         });
 }
 

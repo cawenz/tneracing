@@ -24,108 +24,179 @@ class RaceDataHandler(http.server.SimpleHTTPRequestHandler):
     @staticmethod
     def format_time(seconds):
         return RaceTimer.format_time(seconds)
+
+    @staticmethod
+    def format_total_time(seconds):
+    #Format time in MM:SS.000 format for Total Time display
+        if seconds <= 0:
+            return "-"
+        minutes = int(seconds // 60)
+        seconds = seconds % 60
+        return f"{minutes:02d}:{seconds:06.3f}"
     
     def log_message(self, format, *args):
         """Override to use our logger instead of stderr"""
         logger.debug(f"{self.address_string()} - {format%args}")
     
     def do_GET(self):
-        """Handle GET requests"""
-        # API endpoint for race data
-        # In web_server.py (Source 2), inside the RaceDataHandler class
-
-# Find the do_GET method and modify the /api/race-data section like this:
-
+    # Handle GET requests"""
         if self.path == '/api/race-data':
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
-            
-            # --- NEW LOGIC START: Live sorting for the web API ---
-            
-            # Prepare the list of racers for sorting
-            all_racers = list(shared_state.racers_data.values())
-            
-            racers_in_progress = [r for r in all_racers if r.get("laps", 0) > 0]
-            racers_not_started = [r for r in all_racers if r.get("laps", 0) == 0]
-
-            # Sort racers in progress by laps (desc) and then by time (asc)
-            racers_in_progress.sort(key=lambda r: (-r['laps'], r['lap_times'][-1]))
-            
-            # Combine the sorted lists
-            sorted_racers = racers_in_progress + racers_not_started
-
-            # Build the JSON response with live positions
-            race_data = {
-                'active': shared_state.race_active,
-                'elapsed': time.time() - shared_state.race_start_time if shared_state.race_active else 0,
-                'elapsed_formatted': self.format_time(time.time() - shared_state.race_start_time if shared_state.race_active else 0),
-                'racers': []
-            }
-
-            for i, racer in enumerate(sorted_racers):
-                # Calculate live position for racers in progress
-                live_position = i + 1 if racer in racers_in_progress else "-"
-                
-                # Format lap times
-                formatted_lap_times = []
-                for lap_time in racer.get('lap_times', []):
-                    formatted_lap_times.append({
-                        'raw': lap_time,
-                        'formatted': self.format_time(lap_time)
-                    })
-                
-                # Add racer to response with the live position
-                race_data['racers'].append({
-                    'id': racer.get('tag'), # Assuming tag is the ID for the web view
-                    'name': racer.get('name', 'Unknown'),
-                    'laps': racer.get('laps', 0),
-                    'position': live_position,  # <-- Using the new live position
-                    'finished': racer.get('finished', False),
-                    'finish_time': racer.get('finish_time', 0),
-                    'finish_time_formatted': self.format_time(racer.get('finish_time', 0)),
-                    'lap_times': formatted_lap_times
-                })
-            
-            # Send JSON response
-            self.wfile.write(json.dumps(race_data).encode())
         
-        # For any other path, serve static files from web directory
+            try:
+            # Prepare the race data structure
+                race_data = {
+                    'active': shared_state.race_active,
+                    'elapsed': time.time() - shared_state.race_start_time if shared_state.race_active else 0,
+                    'elapsed_formatted': self.format_time(time.time() - shared_state.race_start_time if shared_state.race_active else 0),
+                    'racers': [],
+                    'lap_times': []
+                }
+                
+                # Prepare the list of racers for sorting
+                all_racers = []
+                for tag, racer_data in shared_state.racers_data.items():
+                    # Create a copy of racer data with the tag included
+                    racer_copy = racer_data.copy()
+                    racer_copy["tag"] = tag
+                    all_racers.append(racer_copy)
+                
+                # Sort racers: first by those in progress (by laps desc, then by time asc)
+                racers_in_progress = [r for r in all_racers if r.get("laps", 0) > 0]
+                racers_not_started = [r for r in all_racers if r.get("laps", 0) == 0]
+                
+                # Sort racers in progress
+                racers_in_progress.sort(key=lambda r: (-r['laps'], r['lap_times'][-1] if r['lap_times'] else 0))
+                
+                # Combine the sorted lists
+                sorted_racers = racers_in_progress + racers_not_started
+                
+                # Process each racer for the standings data
+                for i, racer in enumerate(sorted_racers):
+                    # For position
+                    position = i + 1 if i < len(racers_in_progress) else 0
+                    
+                    # For total time
+                    finish_time_formatted = "-"
+                    if racer.get("lap_times"):
+                        finish_time_formatted = self.format_total_time(racer["lap_times"][-1])
+                    
+                    # Get the values calculated in main app
+                    gap = racer.get("calculated_gap", "-")
+                    best_lap = racer.get("best_lap", 0)
+                    last_lap = racer.get("last_lap", 0)
+                    
+                    # Format lap values
+                    best_lap_formatted = f"{best_lap:.3f}" if best_lap > 0 else "-"
+                    last_lap_formatted = f"{last_lap:.3f}" if last_lap > 0 else "-"
+                    
+                    # Add this racer to the response
+                    racer_data_for_response = {
+                        'position': position,
+                        'name': racer.get("name", "Unknown"),
+                        'laps': racer.get("laps", 0),
+                        'gap': gap,
+                        'best_lap': best_lap_formatted,
+                        'last_lap': last_lap_formatted,
+                        'finish_time_formatted': finish_time_formatted
+                    }
+                    
+                    race_data['racers'].append(racer_data_for_response)
+                
+                # THIS IS THE FIXED SECTION - Process lap times with correct racer names
+                for tag, racer_data in shared_state.racers_data.items():
+                    # Get the racer name for this specific tag
+                    racer_name = racer_data.get("name", "Unknown")
+                    
+                    # Only process racers with lap times
+                    if racer_data.get("lap_times"):
+                        for j, cumulative_time in enumerate(racer_data["lap_times"]):
+                            lap_number = j + 1
+                            
+                            # Calculate individual lap time
+                            if j == 0:
+                                individual_lap_time = cumulative_time  # First lap
+                            else:
+                                individual_lap_time = cumulative_time - racer_data["lap_times"][j-1]
+                            
+                            # Format times
+                            formatted_lap_time = f"{individual_lap_time:.3f}"
+                            formatted_total_time = self.format_total_time(cumulative_time)
+                            
+                            # Add to lap times array with the correct racer name
+                            race_data['lap_times'].append({
+                                'racer_name': racer_name,  # This will be correct for each racer
+                                'racer_tag': tag,  # Include tag for reference
+                                'lap_number': lap_number,
+                                'lap_time': individual_lap_time,
+                                'lap_time_formatted': formatted_lap_time,
+                                'total_time': cumulative_time,
+                                'total_time_formatted': formatted_total_time
+                            })
+                
+                # Sort lap times by lap number (descending) then by time (ascending)
+                race_data['lap_times'].sort(key=lambda x: (-x['lap_number'], x['total_time']))
+                
+                # Add debug logging to verify racer names in lap times
+                logger.debug(f"Sending {len(race_data['lap_times'])} lap time entries")
+                if race_data['lap_times']:
+                    distinct_racers = set(lap['racer_name'] for lap in race_data['lap_times'])
+                    logger.debug(f"Lap times contain data for {len(distinct_racers)} distinct racers: {distinct_racers}")
+                
+                # Convert the race data to JSON and send it
+                self.wfile.write(json.dumps(race_data).encode())
+        
+            except Exception as e:
+                logger.error(f"Error generating race data: {e}", exc_info=True)
+                error_response = {"error": str(e)}
+                self.wfile.write(json.dumps(error_response).encode())
+    
         else:
-            # Default to index.html if root is requested
+        # Default to index.html if root is requested
             if self.path == '/':
                 self.path = '/index.html'
-            
-            # Get web directory path
+        
+        # Debug the request path
+            logger.debug(f"Request path: {self.path}")
+        
+        # Get the absolute path for the requested file
             web_dir = os.path.join(os.path.dirname(__file__), 'web')
             file_path = os.path.join(web_dir, self.path.lstrip('/'))
-            
-            try:
-                # Make sure the file exists and is in the web directory
-                if not os.path.isfile(file_path) or not os.path.abspath(file_path).startswith(os.path.abspath(web_dir)):
-                    self.send_error(404, 'File not found')
-                    return
-                
-                # Serve the file
-                self.send_response(200)
-                if self.path.endswith('.html'):
-                    self.send_header('Content-Type', 'text/html')
-                elif self.path.endswith('.js'):
-                    self.send_header('Content-Type', 'application/javascript')
-                elif self.path.endswith('.css'):
-                    self.send_header('Content-Type', 'text/css')
-                elif self.path.endswith('.json'):
-                    self.send_header('Content-Type', 'application/json')
-                elif self.path.endswith('.svg'):
-                    self.send_header('Content-Type', 'image/svg+xml')
-                self.end_headers()
-                
-                with open(file_path, 'rb') as file:
-                    self.wfile.write(file.read())
-            
-            except Exception as e:
-                logger.error(f"Error serving {self.path}: {e}")
-                self.send_error(500, f"Server error: {str(e)}")
+        
+            logger.debug(f"Looking for file at: {file_path}")
+        
+        # Security check to prevent directory traversal attacks
+            if not os.path.commonprefix([os.path.abspath(file_path), web_dir]) == web_dir:
+                self.send_error(403, "Forbidden")
+                return
+        
+        # Serve the file if it exists
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                try:
+                    with open(file_path, 'rb') as f:
+                        self.send_response(200)
+                    
+                    # Set the correct content type
+                    if self.path.endswith('.html'):
+                        self.send_header('Content-type', 'text/html')
+                    elif self.path.endswith('.css'):
+                        self.send_header('Content-type', 'text/css')
+                    elif self.path.endswith('.js'):
+                        self.send_header('Content-type', 'application/javascript')
+                    elif self.path.endswith('.json'):
+                        self.send_header('Content-type', 'application/json')
+                    else:
+                        self.send_header('Content-type', 'application/octet-stream')
+                    
+                    self.end_headers()
+                    self.wfile.write(f.read())
+                except Exception as e:
+                    logger.error(f"Error serving file: {e}")
+                    self.send_error(500, f"Server error: {str(e)}")
+            else:
+                self.send_error(404, f"File not found: {file_path}")
 
 def create_web_files():
     """Create the necessary web files if they don't exist"""

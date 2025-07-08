@@ -36,3 +36,12 @@ class RaceTimer:
         minutes = int((seconds % 3600) // 60) 
         seconds = seconds % 60 
         return f"{hours}:{minutes:02d}:{seconds:06.3f}"
+    
+    @staticmethod
+    def format_total_time(seconds):
+    # Format time in MM:SS.000 format for Total Time display
+        if seconds <= 0:
+            return "-"
+        minutes = int(seconds // 60)
+        seconds = seconds % 60
+        return f"{minutes:02d}:{seconds:06.3f}"

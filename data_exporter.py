@@ -69,7 +69,7 @@ class RaceResultsExporter:
 
                         # Format times for output  
                         formatted_lap_duration = self.race_timer.format_time(individual_lap_duration)
-                        formatted_total_elapsed_time = self.race_timer.format_time(cumulative_lap_time)
+                        formatted_total_elapsed_time = self.race_timer.format_total_time(cumulative_lap_time)
 
                         csv_writer.writerow([
                             racer_name,

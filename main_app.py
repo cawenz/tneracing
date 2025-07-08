@@ -524,100 +524,124 @@ class RFIDTagMonitor:
         except:
             pass
 
-    # In your RFIDTagMonitor class (likely from Source 6)
-
     def update_results(self):
         if not shared_state.race_active or not shared_state.racers_data:
             return
-
         try:
-            # Clear existing entries in the standings tree
+        # Clear existing entries in the standings tree
             for item in self.standings_tree.get_children():
                 self.standings_tree.delete(item)
-
-            # Separate racers who have started from those who haven't.
-            # This prevents errors and makes sorting easier.
+        
+        # Clear existing entries in the lap times tree
+            for item in self.lap_times_tree.get_children():
+                self.lap_times_tree.delete(item)
+        
+        # Separate racers who have started from those who haven't.
+        # This prevents errors and makes sorting easier.
             racers_in_progress = []
             racers_not_started = []
             for tag, racer in shared_state.racers_data.items():
+            # Store the tag in the racer data for reference
+                racer["tag_id"] = tag
                 if racer.get("laps", 0) > 0:
                     racers_in_progress.append(racer)
                 else:
                     racers_not_started.append(racer)
-
-            # --- THIS IS THE NEW SORTING LOGIC FOR LIVE STANDINGS ---
-            # 1. Sort by number of laps in DESCENDING order (more laps is better).
-            # 2. For racers with the same number of laps, sort by their last lap's
-            #    total time in ASCENDING order (the racer who got there first is ahead).
-            racers_in_progress.sort(key=lambda r: (-r['laps'], r['lap_times'][-1]))
-
-            logger.info("Updating results with the following racers:")
-            logger.info(racers_in_progress)
-
-            # --- Populate the Standings Tree with Live Positions ---
-            
-            # Check if the race is finished
-            if all(r['finished'] for r in racers_in_progress):
-                # If the race is finished, calculate the final standings
-                final_standings = sorted(racers_in_progress, key=lambda r: (r['position'], r['finish_time']))
-
-                # Update the standings tree with the final standings
-                for i, racer in enumerate(final_standings):
-                    current_position = racer['position']
-
-                    # Calculate gap to first place racer
-                    gap = self.race_timer.format_time(racer['finish_time'] - final_standings[0]['finish_time']) if current_position > 1 else "-"
-
-                    # Calculate best lap time
-                    best_lap_time = self.race_timer.format_time(min(racer['lap_times']))
-
-                    # Calculate last lap time
-                    last_lap_time = self.race_timer.format_time(racer['lap_times'][-1])
-
-                    # Calculate total time
-                    total_time = self.race_timer.format_time(racer['finish_time'])
-
+        
+        # --- THIS IS THE NEW SORTING LOGIC FOR LIVE STANDINGS ---
+        # 1. Sort by number of laps in DESCENDING order (more laps is better).
+        # 2. For racers with the same number of laps, sort by their last lap's
+        #    total time in ASCENDING order (the racer who got there first is ahead).
+            racers_in_progress.sort(key=lambda r: (-r['laps'], r['lap_times'][-1] if r['lap_times'] else 0))
+        
+        # Check if we have any racers in progress before proceeding
+            if not racers_in_progress:
+            # Just display not started racers
+                for racer in racers_not_started:
                     self.standings_tree.insert("", tk.END, values=(
-                        current_position,
+                        "-",
                         racer["name"],
-                        racer["laps"],
-                        gap,
-                        best_lap_time,
-                        last_lap_time,
-                        total_time
+                        0,
+                        "-",
+                        "-",
+                        "-",
+                        "-"
                     ))
-            else:
-                # If the race is not finished, update the standings tree with the live positions
-                for i, racer in enumerate(racers_in_progress):
-                    current_position = i + 1
-                    
-                    # Calculate gap to first place racer
-                    if current_position > 1:
-                        first_place_racer = racers_in_progress[0]
-                        gap = self.race_timer.format_time(racer['lap_times'][-1] - first_place_racer['lap_times'][-1])
+                return
+        
+            # Determine the leader to calculate gaps
+            leader = racers_in_progress[0] if racers_in_progress else None
+            leader_laps = leader["laps"] if leader else 0
+            leader_time = leader["lap_times"][-1] if leader and leader["lap_times"] else 0
+        
+        # --- Populate the Standings Tree with Live Positions ---
+        # Add the currently ranked racers
+            for i, racer in enumerate(racers_in_progress):
+                current_position = i + 1
+            
+            # The time displayed is the total elapsed time of their last completed lap
+                last_lap_time = racer['lap_times'][-1]
+                total_time = self.race_timer.format_total_time(last_lap_time)
+            
+            # Calculate gap from leader
+                gap = "Leader"
+                if racer != leader and racer["lap_times"]:
+                    if racer["laps"] == leader_laps:
+                        # Same lap, calculate time gap
+                        gap_value = racer['lap_times'][-1] - leader_time
+                        gap = f"+{gap_value:.3f}"
                     else:
-                        gap = "-"
-
-                    # Calculate best lap time
-                    best_lap_time = self.race_timer.format_time(min(racer['lap_times']))
-
-                    # Calculate last lap time
-                    last_lap_time = self.race_timer.format_time(racer['lap_times'][-1])
-
-                    # Calculate total time
-                    total_time = self.race_timer.format_time(sum(racer['lap_times']))
-
-                    self.standings_tree.insert("", tk.END, values=(
-                        current_position,
-                        racer["name"],
-                        racer["laps"],
-                        gap,
-                        best_lap_time,
-                        last_lap_time,
-                        total_time
-                    ))
+                        # Different lap, show lap gap
+                        lap_gap = leader_laps - racer["laps"]
+                        gap = f"+{lap_gap} lap{'s' if lap_gap > 1 else ''}"
             
-            # Add the racers who haven't started yet at the bottom of the list
+            # Calculate best lap time
+                best_lap_time = "N/A"
+                best_lap_value = 0
+                if len(racer["lap_times"]) > 1:
+                    lap_durations = []
+                    for j in range(len(racer["lap_times"])):
+                        if j == 0:
+                            lap_durations.append(racer["lap_times"][0])
+                        else:
+                            lap_durations.append(racer["lap_times"][j] - racer["lap_times"][j-1])
+                    
+                    best_lap_value = min(lap_durations)
+                    best_lap_time = f"{best_lap_value:.3f}"
+                elif racer["lap_times"]:
+                    best_lap_value = racer['lap_times'][0]
+                    best_lap_time = f"{best_lap_value:.3f}"
+            
+            # Calculate last lap time
+                last_lap_time_value = 0
+                if len(racer["lap_times"]) > 1:
+                    last_lap_time_value = racer["lap_times"][-1] - racer["lap_times"][-2]
+                    last_lap_time = f"{last_lap_time_value:.3f}"
+                elif racer["lap_times"]:
+                    last_lap_time_value = racer['lap_times'][0]
+                    last_lap_time = f"{last_lap_time_value:.3f}"
+                else:
+                    last_lap_time = "N/A"
+            
+            # IMPORTANT: Store these calculated values in shared_state
+                tag_id = racer.get("tag_id")
+                if tag_id:
+                    shared_state.racers_data[tag_id]["calculated_gap"] = gap
+                    shared_state.racers_data[tag_id]["best_lap"] = best_lap_value
+                    shared_state.racers_data[tag_id]["last_lap"] = last_lap_time_value
+            
+            # Update the UI
+                self.standings_tree.insert("", tk.END, values=(
+                    current_position,
+                    racer["name"],
+                    racer["laps"],
+                    gap,
+                    best_lap_time,
+                    last_lap_time,
+                    total_time
+                ))
+        
+        # Add the racers who haven't started yet at the bottom of the list
             for racer in racers_not_started:
                 self.standings_tree.insert("", tk.END, values=(
                     "-",
@@ -628,13 +652,42 @@ class RFIDTagMonitor:
                     "-",
                     "-"
                 ))
-
+        
+        # --- Populate the Lap Times Tree with Lap Times ---
+            for racer in racers_in_progress:
+                for i, lap_time in enumerate(racer['lap_times']):
+                    lap_num = i + 1
+                
+                # Calculate individual lap duration
+                    if i == 0:
+                        individual_lap_duration = lap_time
+                    else:
+                        individual_lap_duration = lap_time - racer['lap_times'][i-1]
+                
+                # Format times for output
+                    formatted_lap_duration = f"{individual_lap_duration:.3f}"
+                    formatted_total_elapsed_time = self.race_timer.format_total_time(lap_time)
+                
+                    self.lap_times_tree.insert("", tk.END, values=(
+                        racer["name"],
+                        lap_num,
+                        formatted_lap_duration,
+                        formatted_total_elapsed_time
+                    ))
+    
         except Exception as e:
             logger.error(f"Failed to update results display: {e}", exc_info=True)
-
+            import traceback
+            logger.error(traceback.format_exc())
+    
         finally:
             self.root.after(1000, self.update_results)
-
+        
+        # If we have a web server running, update it with latest data
+            if hasattr(self, 'web_server_running') and self.web_server_running:
+                if hasattr(self, 'update_web_data'):
+                    self.update_web_data()
+                    
 if __name__ == "__main__":
     try:
         # Create the main tkinter window
