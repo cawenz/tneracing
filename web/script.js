@@ -35,27 +35,30 @@ function updateStandings(racers) {
         return;
     }
     
+    // Debug: Check the first racer's data structure
+    if (racers.length > 0) {
+        console.log("First racer in standings:", racers[0]);
+    }
+    
     // Add each racer to the table
     racers.forEach(racer => {
         const row = document.createElement('tr');
         
-        // Extract position (could be a number or a string)
+        // Use the formatted values from the server
         const position = racer.position > 0 ? racer.position : '-';
+        const gap = racer.gap || '-';
+        const bestLap = racer.best_lap || '-';
+        const lastLap = racer.last_lap || '-';
+        const totalTime = racer.total_time || racer.finish_time_formatted || '-';
         
-         // Format times with 3 decimal places
-        //const gap = racer.gap || '-';
-        const bestLap = racer.best_lap !== '-' ? racer.best_lap : '-';
-        const lastLap = racer.last_lap !== '-' ? racer.last_lap : '-';
-        const totalTime = racer.total_time !== '-' ? racer.total_time : '-';
-        
-          row.innerHTML = `
-            <td>${racer.position > 0 ? racer.position : '-'}</td>
+        row.innerHTML = `
+            <td>${position}</td>
             <td>${racer.name}</td>
             <td>${racer.laps}</td>
-            <td>${racer.gap || '-'}</td>
-            <td>${racer.best_lap || '-'}</td>
-            <td>${racer.last_lap || '-'}</td>
-            <td>${racer.finish_time_formatted || '-'}</td>
+            <td>${gap}</td>
+            <td>${bestLap}</td>
+            <td>${lastLap}</td>
+            <td>${totalTime}</td>
         `;
         
         standingsBody.appendChild(row);

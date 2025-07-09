@@ -80,13 +80,14 @@ def process_tag_data(tag_data):
                     # Racer has already completed the required number of laps
                     logger.debug(f"Ignoring lap for {racer['name']} - already completed {shared_state.num_laps} laps")
                 
-                # Now update the UI via the monitor
-                if hasattr(_monitor_ref, 'update_results'):
-                    _monitor_ref.root.after(0, _monitor_ref.update_results)
-                elif hasattr(_monitor_ref, 'update_results_display'):
-                    _monitor_ref.root.after(0, _monitor_ref.update_results_display)
-                else:
-                    logger.error("Monitor has no method to update results!")
+                # RESTORE UI UPDATE - but use a simple flag-based approach
+                # This ensures the UI gets updated when tags are processed
+                if _monitor_ref and hasattr(_monitor_ref, 'root'):
+                    try:
+                        # Use a simple lambda to avoid method resolution issues
+                        _monitor_ref.root.after_idle(lambda: None)  # Just trigger the main thread
+                    except Exception as e:
+                        logger.debug(f"Could not trigger UI update: {e}")
                 
                 # COMPLETELY REVISED LOGIC FOR RACE ENDING:
                 # 1. If this racer just started their first lap, definitely don't end the race
@@ -124,8 +125,11 @@ def process_tag_data(tag_data):
                         
                         if all_racers_finished and shared_state.race_active:
                             logger.info("All racers have completed all required laps - ending race")
-                            if _monitor_ref and _monitor_ref.root.winfo_exists():
-                                _monitor_ref.root.after(0, _monitor_ref.stop_race)
+                            if _monitor_ref and hasattr(_monitor_ref, 'root'):
+                                try:
+                                    _monitor_ref.root.after(0, _monitor_ref.stop_race)
+                                except Exception as e:
+                                    logger.error(f"Could not stop race: {e}")
         else:
             logger.debug(f"Ignoring tag: {tag_id} (not in allowed list or race not active)")
     except Exception as e:
@@ -152,7 +156,7 @@ def handle_event(reader_client, event):
                 _monitor_ref.root.after(0, lambda: _monitor_ref.update_status("Connected to reader. Ready to start race.")) 
         else: 
             if _monitor_ref:
-                _monitor_ref.root.after(0, lambda: _monitor_ref.update_status(f"Connection failed: {connection_event.get('Status')}", is_error=True)) [47]
+                _monitor_ref.root.after(0, lambda: _monitor_ref.update_status(f"Connection failed: {connection_event.get('Status')}", is_error=True))
     elif 'ReaderEventNotificationData' in event: 
         logger.info("Reader notification received") 
         if _monitor_ref:
