@@ -40,14 +40,13 @@ function updateStandings(racers) {
         const row = document.createElement('tr');
         
         // Extract position (could be a number or a string)
-        //const position = racer.position > 0 ? racer.position : '-';
+        const position = racer.position > 0 ? racer.position : '-';
         
-        // Use data directly from the server's formatted strings
-        // This avoids JavaScript formatting inconsistencies
+         // Format times with 3 decimal places
         //const gap = racer.gap || '-';
-        //const bestLap = racer.best_lap || '-';
-        //const lastLap = racer.last_lap || '-';
-        //const totalTime = racer.finish_time_formatted || '-';
+        const bestLap = racer.best_lap !== '-' ? racer.best_lap : '-';
+        const lastLap = racer.last_lap !== '-' ? racer.last_lap : '-';
+        const totalTime = racer.total_time !== '-' ? racer.total_time : '-';
         
           row.innerHTML = `
             <td>${racer.position > 0 ? racer.position : '-'}</td>
@@ -78,7 +77,7 @@ function updateLapTimes(data) {
             return a.total_time - b.total_time; // Faster times first for same lap
         });
         
-        // Display the lap times
+        // Display the lap times with formatted values
         sortedLapTimes.forEach(lap => {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -125,11 +124,16 @@ function updateLapTimes(data) {
         allLapEvents.forEach(event => {
             const individualLapTime = event.cumulativeTimeRaw - event.previousCumulativeTimeRaw;
             const row = document.createElement('tr');
+            
+            // Format the times with 3 decimal places
+            const formattedIndividualLap = formatLapTime(individualLapTime);
+            const formattedCumulativeTime = formatTimeNoHours(event.cumulativeTimeRaw);
+            
             row.innerHTML = `
                 <td>${event.racerName}</td>
                 <td>${event.lapNumber}</td>
-                <td>${formatLapTime(individualLapTime)}</td>
-                <td>${formatTimeNoHours(event.cumulativeTimeRaw)}</td>
+                <td>${formattedIndividualLap}</td>
+                <td>${formattedCumulativeTime}</td>
             `;
             lapTimesBody.appendChild(row);
         });

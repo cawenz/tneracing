@@ -159,8 +159,6 @@ class RFIDTagMonitor:
         self.standings_tree.heading("last_lap_time", text="Last Lap Time")
         self.standings_tree.heading("total_time", text="Total Time")
 
-# ... (rest of the setup)
-    
         results_scrollbar = ttk.Scrollbar(standings_frame, orient="vertical", command=self.standings_tree.yview)
         self.standings_tree.configure(yscrollcommand=results_scrollbar.set)
     
@@ -413,60 +411,46 @@ class RFIDTagMonitor:
         if not shared_state.race_active:
             logger.debug(f"Tag read but race not active: {tag_id}")
             return
-        
+    
         # Debug output
         logger.info(f"Processing tag reading: {tag_id}")
-
-    # Check if tag belongs to a racer in current race
-        if tag_id in shared_state.ALLOWED_TAGS:
-        # Get racer data or initialize if first reading
-            if tag_id not in shared_state.racers_data:
-                logger.warning(f"Tag {tag_id} is allowed but not in racers_data, initializing")
-                racer_name = "Unknown"
-                for racer in self.racer_manager.racers:
-                    if racer["tag"] == tag_id:
-                        racer_name = f"{racer['first_name']} {racer['last_name']}"
-                        break
-                shared_state.racers_data[tag_id] = {
-                    "name": racer_name,
-                    "laps": 0,
-                    "lap_times": [],
-                    "position": 0,
-                    "finish_time": 0,
-                    "finished": False
-                }
-
-            racer = shared_state.racers_data[tag_id]
-        
-            # Calculate time since race start
-            lap_time = timestamp - shared_state.race_start_time
-        
-            # Calculate individual lap time if not the first lap
-            if racer["lap_times"]:
-                individual_lap_time = lap_time - racer["lap_times"][-1]
-            else:
-                individual_lap_time = lap_time
-
-        # Debug info
-            print(f"Processing tag: {tag_id}, racer: {racer['name']}, current laps: {racer['laps']}")
-        
-        # Logic for counting new laps based on time delay
-            if racer["laps"] > 0 or racer["lap_times"]:
+    
+        # Check if the tag belongs to a racer
+        if tag_id not in shared_state.racers_data:
+            logger.warning(f"Tag {tag_id} not found in racers_data")
+            return
+    
+        # Get the racer data
+        racer = shared_state.racers_data[tag_id]
+    
+        # Calculate the lap time
+        lap_time = time.time() - shared_state.race_start_time
+    
+        # Calculate individual lap duration
+        if not racer["lap_times"]:
+            individual_lap_time = lap_time  # First lap
+        else:
+            individual_lap_time = lap_time - racer["lap_times"][-1]
+    
+        logger.debug(f"Processing tag: {tag_id}, racer: {racer['name']}, current laps: {racer['laps']}")
+    
+    # Logic for counting new laps based on time delay
+        if racer["laps"] > 0 or racer["lap_times"]:
             # Check if enough time has passed since last lap
-                if not racer["lap_times"] or (lap_time - racer["lap_times"][-1] > shared_state.DELAY_SECONDS):
-                    racer["laps"] += 1
-                    racer["lap_times"].append(lap_time)
-                
-                # Update lap times display
+            if not racer["lap_times"] or (lap_time - racer["lap_times"][-1] > shared_state.DELAY_SECONDS):
+                racer["laps"] += 1
+                racer["lap_times"].append(lap_time)
+            
+            # Update lap times display
                 self.lap_times_tree.insert("", 0, values=(
                     racer["name"], 
                     racer["laps"],
-                    self.race_timer.format_time(individual_lap_time),
+                    f"{individual_lap_time:.3f}",
                     self.race_timer.format_time(lap_time)
                 ))
-                
+            
                 logger.info(f"Racer {racer['name']} completed lap {racer['laps']} in {individual_lap_time:.2f}s (total: {lap_time:.2f}s)")
-                
+            
                 # Check if racer finished the race
                 if racer["laps"] >= shared_state.num_laps and not racer["finished"]:
                     racer["finished"] = True
@@ -478,22 +462,28 @@ class RFIDTagMonitor:
                             position += 1
                     racer["position"] = position
                     logger.info(f"Racer {racer['name']} finished in position {position} with time {lap_time:.2f}s")
-                    self.show_race_results()
-                    # Update results tree
-                    self.update_results()
+                
+                # Show race results if appropriate
+                    if all(r.get("finished", False) or r.get("laps", 0) == 0 for r in shared_state.racers_data.values()):
+                        self.show_race_results()
+            
+                # Always update results after a new lap
+                self.update_results()
             else:
                 logger.debug(f"Ignoring too fast lap for {racer['name']} (ID: {tag_id})")
         else:
-            # First reading for this racer
+        # First reading for this racer
             racer["lap_times"].append(lap_time)
             racer["laps"] = 1
             self.lap_times_tree.insert("", 0, values=(
-                racer["name"], 
-                1, 
-                self.race_timer.format_time(lap_time), 
-                self.race_timer.format_time(lap_time)
-            ))
-            logger.info(f"Racer {racer['name']} started race, lap 1: {lap_time:.2f}s")
+            racer["name"], 
+            1, 
+            f"{lap_time:.3f}", 
+            self.race_timer.format_time(lap_time)
+        ))
+        logger.info(f"Racer {racer['name']} started race, lap 1: {lap_time:.2f}s")
+        # Update results after first lap
+        self.update_results()
 
     def update_status(self, message, is_error=False):
         """Update the status message"""
@@ -525,38 +515,43 @@ class RFIDTagMonitor:
             pass
 
     def update_results(self):
+        """Update the race results display"""
+        # Skip if race is not active or no racers
         if not shared_state.race_active or not shared_state.racers_data:
+            # Schedule the next update
+            self.root.after(1000, self.update_results)
             return
+        
         try:
-        # Clear existing entries in the standings tree
+            # Clear existing entries in the standings tree
             for item in self.standings_tree.get_children():
                 self.standings_tree.delete(item)
-        
-        # Clear existing entries in the lap times tree
+                
+            # Clear existing entries in the lap times tree
             for item in self.lap_times_tree.get_children():
                 self.lap_times_tree.delete(item)
-        
-        # Separate racers who have started from those who haven't.
-        # This prevents errors and makes sorting easier.
+                
+            # Separate racers who have started from those who haven't.
+            # This prevents errors and makes sorting easier.
             racers_in_progress = []
             racers_not_started = []
             for tag, racer in shared_state.racers_data.items():
-            # Store the tag in the racer data for reference
+                # Store the tag in the racer data for reference
                 racer["tag_id"] = tag
                 if racer.get("laps", 0) > 0:
                     racers_in_progress.append(racer)
                 else:
                     racers_not_started.append(racer)
-        
-        # --- THIS IS THE NEW SORTING LOGIC FOR LIVE STANDINGS ---
-        # 1. Sort by number of laps in DESCENDING order (more laps is better).
-        # 2. For racers with the same number of laps, sort by their last lap's
-        #    total time in ASCENDING order (the racer who got there first is ahead).
+                    
+            # --- THIS IS THE NEW SORTING LOGIC FOR LIVE STANDINGS ---
+            # 1. Sort by number of laps in DESCENDING order (more laps is better).
+            # 2. For racers with the same number of laps, sort by their last lap's
+            #    total time in ASCENDING order (the racer who got there first is ahead).
             racers_in_progress.sort(key=lambda r: (-r['laps'], r['lap_times'][-1] if r['lap_times'] else 0))
-        
-        # Check if we have any racers in progress before proceeding
+            
+            # Check if we have any racers in progress before proceeding
             if not racers_in_progress:
-            # Just display not started racers
+                # Just display not started racers
                 for racer in racers_not_started:
                     self.standings_tree.insert("", tk.END, values=(
                         "-",
@@ -567,23 +562,26 @@ class RFIDTagMonitor:
                         "-",
                         "-"
                     ))
+                
+                # Schedule the next update and return
+                self.root.after(1000, self.update_results)
                 return
-        
+                    
             # Determine the leader to calculate gaps
             leader = racers_in_progress[0] if racers_in_progress else None
             leader_laps = leader["laps"] if leader else 0
             leader_time = leader["lap_times"][-1] if leader and leader["lap_times"] else 0
-        
-        # --- Populate the Standings Tree with Live Positions ---
-        # Add the currently ranked racers
+                
+            # --- Populate the Standings Tree with Live Positions ---
+            # Add the currently ranked racers
             for i, racer in enumerate(racers_in_progress):
                 current_position = i + 1
-            
-            # The time displayed is the total elapsed time of their last completed lap
+                    
+                # The time displayed is the total elapsed time of their last completed lap
                 last_lap_time = racer['lap_times'][-1]
                 total_time = self.race_timer.format_total_time(last_lap_time)
-            
-            # Calculate gap from leader
+                    
+                # Calculate gap from leader
                 gap = "Leader"
                 if racer != leader and racer["lap_times"]:
                     if racer["laps"] == leader_laps:
@@ -594,8 +592,8 @@ class RFIDTagMonitor:
                         # Different lap, show lap gap
                         lap_gap = leader_laps - racer["laps"]
                         gap = f"+{lap_gap} lap{'s' if lap_gap > 1 else ''}"
-            
-            # Calculate best lap time
+                    
+                # Calculate best lap time
                 best_lap_time = "N/A"
                 best_lap_value = 0
                 if len(racer["lap_times"]) > 1:
@@ -605,14 +603,14 @@ class RFIDTagMonitor:
                             lap_durations.append(racer["lap_times"][0])
                         else:
                             lap_durations.append(racer["lap_times"][j] - racer["lap_times"][j-1])
-                    
+                            
                     best_lap_value = min(lap_durations)
                     best_lap_time = f"{best_lap_value:.3f}"
                 elif racer["lap_times"]:
                     best_lap_value = racer['lap_times'][0]
                     best_lap_time = f"{best_lap_value:.3f}"
-            
-            # Calculate last lap time
+                    
+                # Calculate last lap time
                 last_lap_time_value = 0
                 if len(racer["lap_times"]) > 1:
                     last_lap_time_value = racer["lap_times"][-1] - racer["lap_times"][-2]
@@ -622,15 +620,17 @@ class RFIDTagMonitor:
                     last_lap_time = f"{last_lap_time_value:.3f}"
                 else:
                     last_lap_time = "N/A"
-            
-            # IMPORTANT: Store these calculated values in shared_state
+                    
+                # IMPORTANT: Store these calculated values in shared_state
                 tag_id = racer.get("tag_id")
                 if tag_id:
                     shared_state.racers_data[tag_id]["calculated_gap"] = gap
                     shared_state.racers_data[tag_id]["best_lap"] = best_lap_value
                     shared_state.racers_data[tag_id]["last_lap"] = last_lap_time_value
-            
-            # Update the UI
+                    # Also update position for web display
+                    shared_state.racers_data[tag_id]["position"] = current_position
+                    
+                # Update the UI
                 self.standings_tree.insert("", tk.END, values=(
                     current_position,
                     racer["name"],
@@ -640,8 +640,8 @@ class RFIDTagMonitor:
                     last_lap_time,
                     total_time
                 ))
-        
-        # Add the racers who haven't started yet at the bottom of the list
+                
+            # Add the racers who haven't started yet at the bottom of the list
             for racer in racers_not_started:
                 self.standings_tree.insert("", tk.END, values=(
                     "-",
@@ -652,42 +652,103 @@ class RFIDTagMonitor:
                     "-",
                     "-"
                 ))
-        
-        # --- Populate the Lap Times Tree with Lap Times ---
+                
+            # --- Populate the Lap Times Tree with Lap Times ---
             for racer in racers_in_progress:
                 for i, lap_time in enumerate(racer['lap_times']):
                     lap_num = i + 1
-                
-                # Calculate individual lap duration
+                    
+                    # Calculate individual lap duration
                     if i == 0:
                         individual_lap_duration = lap_time
                     else:
                         individual_lap_duration = lap_time - racer['lap_times'][i-1]
-                
-                # Format times for output
+                        
+                    # Format times for output
                     formatted_lap_duration = f"{individual_lap_duration:.3f}"
                     formatted_total_elapsed_time = self.race_timer.format_total_time(lap_time)
-                
+                        
                     self.lap_times_tree.insert("", tk.END, values=(
                         racer["name"],
                         lap_num,
                         formatted_lap_duration,
                         formatted_total_elapsed_time
                     ))
-    
+        
         except Exception as e:
             logger.error(f"Failed to update results display: {e}", exc_info=True)
             import traceback
             logger.error(traceback.format_exc())
-    
-        finally:
-            self.root.after(1000, self.update_results)
         
-        # If we have a web server running, update it with latest data
+        finally:
+            # If we have a web server running, update it with latest data
             if hasattr(self, 'web_server_running') and self.web_server_running:
                 if hasattr(self, 'update_web_data'):
                     self.update_web_data()
+            
+            # Schedule the next update - only schedule once
+            self.root.after(1000, self.update_results)
+
+    def update_web_data(self):
+        #"""Update shared_state with latest race data for the web server"""
+        try:
+            # Skip if race timer isn't initialized
+            if not hasattr(self, 'race_timer'):
+                return
+                
+            # Update shared state with current race status
+            shared_state.race_active = getattr(self, 'race_active', False)
+            shared_state.race_start_time = getattr(self, 'race_start_time', 0)
+            
+            # Process racer data for display
+            racers_in_progress = sorted(
+                list(shared_state.racers_data.values()),
+                key=lambda x: (-(x.get('laps', 0) or 0), x.get('lap_times', [])[-1] if x.get('lap_times') else float('inf'))
+            )
+            
+            for i, racer in enumerate(racers_in_progress):
+                # Get racer ID
+                racer_id = racer.get('id') or racer.get('tag_id')
+                if racer_id in shared_state.racers_data:
+                    # Update position
+                    shared_state.racers_data[racer_id]['position'] = i + 1
                     
+                    # Calculate gap to leader
+                    if i == 0:  # Leader
+                        shared_state.racers_data[racer_id]['gap'] = "-"
+                    else:
+                        leader = racers_in_progress[0]
+                        if racer.get('laps', 0) < leader.get('laps', 0):
+                            lap_diff = leader.get('laps', 0) - racer.get('laps', 0)
+                            shared_state.racers_data[racer_id]['gap'] = f"{lap_diff} lap{'s' if lap_diff > 1 else ''}"
+                        elif racer.get('lap_times') and leader.get('lap_times'):
+                            time_diff = racer['lap_times'][-1] - leader['lap_times'][-1]
+                            shared_state.racers_data[racer_id]['gap'] = f"+{time_diff:.3f}s"
+                        else:
+                            shared_state.racers_data[racer_id]['gap'] = "-"
+                    
+                    # Calculate lap times
+                    if racer.get('lap_times'):
+                        lap_times = []
+                        prev_time = 0
+                        for lap_time in racer.get('lap_times', []):
+                            individual_lap = lap_time - prev_time
+                            lap_times.append(individual_lap)
+                            prev_time = lap_time
+                        
+                        if lap_times:
+                            best_lap = min(lap_times)
+                            shared_state.racers_data[racer_id]['best_lap'] = f"{best_lap:.3f}s"
+                            shared_state.racers_data[racer_id]['last_lap'] = f"{lap_times[-1]:.3f}s"
+                            shared_state.racers_data[racer_id]['total_time'] = f"{racer['lap_times'][-1]:.3f}s"
+            
+            # Now update the race data cache in the web server module
+            from web_server import update_race_data_cache
+            update_race_data_cache()
+            
+        except Exception as e:
+            logger.error(f"Error updating web data: {e}", exc_info=True)
+
 if __name__ == "__main__":
     try:
         # Create the main tkinter window
