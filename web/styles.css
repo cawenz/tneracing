@@ -60,27 +60,36 @@ h1 {
 
 .tabs {
     display: flex;
-    background-color: #34495e;
+    background-color: #2c3e50; /* Darker background for inactive tabs */
+    padding: 10px 15px; /* Add padding around the tab container */
+    gap: 8px; /* Add space between tab buttons */
 }
 
 .tab-button {
-    background-color: transparent;
+    background-color: #5d6d7e; /* Match the table header color */
     border: none;
-    color: #fff;
-    padding: 15px 20px;
+    color: #ecf0f1; /* Lighter text for better contrast against the darker background */
+    padding: 12px 24px; /* Slightly more padding for better touch targets */
     cursor: pointer;
     flex: 1;
     font-size: 1rem;
-    transition: background-color 0.3s;
+    border-radius: 8px; /* Rounded corners */
+    transition: background-color 0.3s, color 0.3s, transform 0.2s;
+    margin: 0; /* Reset any default margins */
 }
 
 .tab-button:hover {
-    background-color: #2c3e50;
+    background-color: #34495e;
+    color: #ecf0f1; /* Lighter text on hover */
+    transform: translateY(-1px); /* Subtle lift effect on hover */
 }
 
 .tab-button.active {
-    background-color: #2c3e50;
-    border-bottom: 3px solid #3498db;
+    background-color: #3498db; /* Bright blue for active tab */
+    color: white; /* Pure white text for active tab */
+    border-bottom: 3px solid #2980b9; /* Darker blue border */
+    transform: translateY(-2px); /* Slightly more pronounced lift for active tab */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
 }
 
 .tab-content {
@@ -100,12 +109,13 @@ h1 {
 .results-table th,
 .results-table td {
     padding: 12px;
-    text-align: left;
+    text-align: center; /* Center all text */
     border-bottom: 1px solid #ddd;
 }
 
 .results-table th {
-    background-color: #f2f2f2;
+    background-color: #5d6d7e; /* Lighter version of #34495e - about 25% less saturated */
+    color: white; /* White text for better contrast */
     font-weight: bold;
 }
 
@@ -113,14 +123,36 @@ h1 {
     background-color: #f5f5f5;
 }
 
-.results-table th:nth-child(1) { width: 10%; } /* Position */
-.results-table th:nth-child(2) { width: 25%; } /* Racer */
-.results-table th:nth-child(3) { width: 10%; } /* Laps */
-.results-table th:nth-child(4) { width: 10%; } /* Gap */
-.results-table th:nth-child(5) { width: 15%; } /* Best Lap */
-.results-table th:nth-child(6) { width: 15%; } /* Last Lap */
-.results-table th:nth-child(7) { width: 15%; } /* Total Time */
+/* Column width adjustments for the new status column */
+.results-table th:nth-child(1) { width: 8%; }  /* Position */
+.results-table th:nth-child(2) { width: 8%; }  /* Status */
+.results-table th:nth-child(3) { width: 20%; } /* Racer */
+.results-table th:nth-child(4) { width: 8%; }  /* Laps */
+.results-table th:nth-child(5) { width: 12%; } /* Gap */
+.results-table th:nth-child(6) { width: 15%; } /* Best Lap */
+.results-table th:nth-child(7) { width: 15%; } /* Last Lap */
+.results-table th:nth-child(8) { width: 14%; } /* Total Time */
 
+/* Status indicator styles for race status */
+.racer-status {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin: 0 auto;
+}
+
+.racer-status.racing {
+    background-color: #3498db; /* Blue for racing */
+}
+
+.racer-status.finished {
+    background-color: #2ecc71; /* Green for finished */
+}
+
+.racer-status.not-started {
+    background-color: #95a5a6; /* Gray for not started */
+}
 
 footer {
     display: flex;
@@ -134,8 +166,8 @@ footer {
 #refresh-status {
     font-style: italic;
 }
+
 /* Updated table style*/
-/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 table {
     width: 100%;              /* Make table use full container width */
     border-collapse: separate; /* Allow spacing between cells */
@@ -146,6 +178,7 @@ table {
 th, td {
     padding: 12px 16px;       /* Add padding inside cells */
     font-size: 1.1rem;        /* Increase text size */
+    text-align: center;       /* Center all text */
 }
 
 th {
@@ -167,11 +200,9 @@ tbody tr:hover {
 
 /* Ensure text alignment */
 td, th {
-    text-align: left;
+    text-align: center;
     vertical-align: middle;
 }
-/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
-
 
 /* Responsive design */
 @media (max-width: 768px) {

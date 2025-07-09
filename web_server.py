@@ -42,6 +42,7 @@ def update_race_data_cache():
                 "active": shared_state.race_active,
                 "elapsed": elapsed,
                 "elapsed_formatted": RaceTimer.format_time(elapsed),
+                "target_laps": shared_state.num_laps,  # Add this for status determination
                 "racers": [],
                 "lap_times": []
             }
@@ -92,6 +93,8 @@ def update_race_data_cache():
                     "name": racer["name"],
                     "laps": racer["laps"],
                     "position": racer["position"],
+                    "finished": racer.get("finished", False),  # Add finished status
+                    "target_laps": shared_state.num_laps,      # Add target laps for comparison
                     "gap": gap_display,
                     "best_lap": best_lap_display,
                     "last_lap": last_lap_display,

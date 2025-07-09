@@ -31,7 +31,7 @@ function updateTimer(elapsedFormatted) {
 function updateStandings(racers) {
     standingsBody.innerHTML = '';
     if (!racers || racers.length === 0) {
-        standingsBody.innerHTML = '<tr><td colspan="7">No racers in the race.</td></tr>';
+        standingsBody.innerHTML = '<tr><td colspan="8">No racers in the race.</td></tr>';
         return;
     }
     
@@ -51,7 +51,23 @@ function updateStandings(racers) {
         const lastLap = racer.last_lap || '-';
         const totalTime = racer.total_time || racer.finish_time_formatted || '-';
         
+        // Determine racer status and create status indicator
+        let statusIndicator = '';
+        let statusClass = '';
+        
+        if (racer.laps === 0) {
+            statusClass = 'not-started';
+            statusIndicator = '<div class="racer-status not-started" title="Not Started"></div>';
+        } else if (racer.finished || (racer.laps >= racer.target_laps)) {
+            statusClass = 'finished';
+            statusIndicator = '<div class="racer-status finished" title="Finished"></div>';
+        } else {
+            statusClass = 'racing';
+            statusIndicator = '<div class="racer-status racing" title="Racing"></div>';
+        }
+        
         row.innerHTML = `
+            <td>${statusIndicator}</td>    
             <td>${position}</td>
             <td>${racer.name}</td>
             <td>${racer.laps}</td>
