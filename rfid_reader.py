@@ -175,9 +175,9 @@ def start_rfid_reader():
         _monitor_ref.root.after(0, lambda: _monitor_ref.update_status("Initializing RFID reader connection..."))
 
     try:
-        logger.info(f"Connecting to reader at {READER_IP}") # Use constant from config
+        logger.info(f"Connecting to reader at {shared_state.READER_IP}") # Use constant from config
         if _monitor_ref:
-            _monitor_ref.root.after(0, lambda: _monitor_ref.update_status(f"Connecting to reader at {READER_IP}..."))
+            _monitor_ref.root.after(0, lambda: _monitor_ref.update_status(f"Connecting to reader at {shared_state.READER_IP}..."))
 
         config = LLRPReaderConfig() 
         config.reset_on_connect = True 
@@ -192,7 +192,7 @@ def start_rfid_reader():
             'EnableAntennaID': True, 'EnablePeakRSSI': True, 'EnableTagSeenCount': True
         }
 
-        _reader_client_instance = LLRPReaderClient(READER_IP, READER_PORT, config) # Create instance [50]
+        _reader_client_instance = LLRPReaderClient(shared_state.READER_IP, READER_PORT, config) # Create instance [50]
         _reader_client_instance.add_tag_report_callback(tag_seen_callback) 
         _reader_client_instance.add_event_callback(handle_event)
 
@@ -221,6 +221,8 @@ def start_rfid_reader():
         logger.error(error_msg, exc_info=True)
         if _monitor_ref: 
             _monitor_ref.root.after(0, lambda: _monitor_ref.update_status(error_msg, is_error=True))
+            # Reset the connection UI so user can try again
+            _monitor_ref.root.after(3000, _monitor_ref.reset_connection_ui)
 
 def disconnect_rfid_reader():
     """Function to be called from main app to initiate disconnection."""

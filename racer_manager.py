@@ -29,7 +29,7 @@ class RacerManager:
         self.window.geometry("900x700")
         self.window.protocol("WM_DELETE_WINDOW", self.hide)
         self.window.transient(parent)
-        self.window.grab_set()
+        self.window.withdraw()
 
         main_frame = ttk.Frame(self.window, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
