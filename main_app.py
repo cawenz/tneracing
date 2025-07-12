@@ -349,7 +349,7 @@ class RFIDTagMonitor:
         self.standings_tree["columns"] = ("position", "racer", "laps", "gap", "best_lap_time", "last_lap_time", "total_time")
         self.standings_tree.column("#0", width=0, stretch=tk.NO)
         for column in self.standings_tree["columns"]:
-            self.standings_tree.column(column, anchor=tk.W, width=100)
+            self.standings_tree.column(column, anchor=tk.CENTER, width=100)
             self.standings_tree.heading(column, text=column.capitalize().replace("_", " "))
         self.standings_tree.heading("position", text="Position")
         self.standings_tree.heading("racer", text="Racer")
@@ -377,10 +377,10 @@ class RFIDTagMonitor:
         self.lap_times_tree.heading("lap_time", text="Lap Time")
         self.lap_times_tree.heading("total_time", text="Total Time")
 
-        self.lap_times_tree.column("racer", width=200)
-        self.lap_times_tree.column("lap", width=50)
-        self.lap_times_tree.column("lap_time", width=100)
-        self.lap_times_tree.column("total_time", width=100)
+        self.lap_times_tree.column("racer", width=200,anchor=tk.CENTER)
+        self.lap_times_tree.column("lap", width=50,anchor=tk.CENTER)
+        self.lap_times_tree.column("lap_time", width=100,anchor=tk.CENTER)
+        self.lap_times_tree.column("total_time", width=100,anchor=tk.CENTER)
 
         lap_times_scrollbar = ttk.Scrollbar(lap_times_frame, orient="vertical", command=self.lap_times_tree.yview)
         self.lap_times_tree.configure(yscrollcommand=lap_times_scrollbar.set)
