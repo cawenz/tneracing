@@ -41,68 +41,108 @@ class RFIDTagMonitor:
         self.update_results()
 
     def setup_ui(self):
-        """Setup the user interface with improved race setup"""
+        """Setup the user interface with unified background and improved styling"""
         self.root.title("RFID Race Timer")  
-        self.root.geometry("1000x700")  # Increased width for new layout
-    
-        main_frame = ttk.Frame(self.root, padding=10)  
+        self.root.geometry("1100x700")
+        
+        # Define unified color scheme
+        UNIFIED_BG = "#f8f9fa"  # Light gray background for all frames
+        HEADING_FONT = ("Segoe UI", 14, "bold")  # Modern font for headings
+        
+        # Configure root background
+        self.root.configure(bg=UNIFIED_BG)
+        
+        main_frame = ttk.Frame(self.root, padding="5 10 10 10")
         main_frame.pack(fill=tk.BOTH, expand=True)  
-    
-        # Status/Message Center (STYLED)
-        status_frame = ttk.LabelFrame(main_frame, text="📢 Message Center")
-        status_frame.pack(fill=tk.X, pady=(0, 10))
         
-        status_inner_frame = ttk.Frame(status_frame)
-        status_inner_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Create main horizontal layout
+        content_frame = ttk.Frame(main_frame)
+        content_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.status_label = ttk.Label(status_inner_frame, text="Starting application...", 
-                                    font=("Arial", 11), foreground="#2c3e50")
-        self.status_label.pack(anchor=tk.W)  
-    
-        # RFID Reader Connection frame
-        connection_frame = ttk.LabelFrame(main_frame, text="RFID Reader Connection")  
-        connection_frame.pack(fill=tk.X, pady=5)  
-    
-        ip_frame = ttk.Frame(connection_frame)  
-        ip_frame.pack(side=tk.LEFT, padx=10, pady=5)  
-    
-        ttk.Label(ip_frame, text="Reader IP:").pack(side=tk.LEFT, padx=5)  
+        # LEFT HALF - Setup and Connection
+        left_frame = ttk.Frame(content_frame)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
+        # RIGHT HALF - Timer and Results  
+        right_frame = ttk.Frame(content_frame)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # === LEFT HALF CONTENT ===
+        
+        # Status/Message Center
+        status_outer = tk.Frame(left_frame, bg=UNIFIED_BG, relief="solid", bd=1)
+        status_outer.pack(fill=tk.X, pady=(0, 10))
+        
+        status_label_frame = tk.Label(status_outer, text="📢  Message Center", 
+                                    bg=UNIFIED_BG, fg="#1e88e5", 
+                                    font=HEADING_FONT, anchor="w")
+        status_label_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        self.status_label = tk.Label(status_outer, text="Starting application...", 
+                                font=("Arial", 11), fg="#2c3e50", bg=UNIFIED_BG, anchor="w")
+        self.status_label.pack(fill=tk.X, padx=15, pady=(0, 15))
+
+        # RFID Reader Connection
+        connection_outer = tk.Frame(left_frame, bg=UNIFIED_BG, relief="solid", bd=1)
+        connection_outer.pack(fill=tk.X, pady=5)
+        
+        conn_label = tk.Label(connection_outer, text="🔗  RFID Reader Connection", 
+                            bg=UNIFIED_BG, fg="#7b1fa2", 
+                            font=HEADING_FONT, anchor="w")
+        conn_label.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        conn_content = tk.Frame(connection_outer, bg=UNIFIED_BG)
+        conn_content.pack(fill=tk.X, padx=15, pady=(5, 15))
+
+        ip_frame = tk.Frame(conn_content, bg=UNIFIED_BG)
+        ip_frame.pack(side=tk.LEFT, pady=5)
+
+        tk.Label(ip_frame, text="Reader IP:", bg=UNIFIED_BG, font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
         self.ip_var = tk.StringVar(value=READER_IP)
-        ttk.Entry(ip_frame, textvariable=self.ip_var, width=15).pack(side=tk.LEFT)  
-    
+        ttk.Entry(ip_frame, textvariable=self.ip_var, width=15).pack(side=tk.LEFT)
+
         # Connection buttons
-        button_frame = ttk.Frame(connection_frame)  
-        button_frame.pack(side=tk.LEFT, padx=10, pady=5)  
-    
-        self.connect_btn = ttk.Button(button_frame, text="Connect", command=self.connect_reader)  
-        self.connect_btn.pack(side=tk.LEFT, padx=5)  
-    
+        button_frame = tk.Frame(conn_content, bg=UNIFIED_BG)
+        button_frame.pack(side=tk.LEFT, padx=10, pady=5)
+
+        self.connect_btn = ttk.Button(button_frame, text="Connect", command=self.connect_reader)
+        self.connect_btn.pack(side=tk.LEFT, padx=5)
+
         self.disconnect_btn = ttk.Button(button_frame, text="Disconnect", 
-                                     command=self.disconnect_reader, state=tk.DISABLED)  
-        self.disconnect_btn.pack(side=tk.LEFT, padx=5)  
-    
+                                    command=self.disconnect_reader, state=tk.DISABLED)
+        self.disconnect_btn.pack(side=tk.LEFT, padx=5)
+
         # Connection status
-        self.connection_status = ttk.Label(connection_frame, text="Not connected", foreground="red")
+        self.connection_status = tk.Label(conn_content, text="Not connected", 
+                                        foreground="red", bg=UNIFIED_BG, font=("Arial", 10, "bold"))
         self.connection_status.pack(side=tk.LEFT, padx=10)
 
-        # Race Setup Section (FULL WIDTH)
-        setup_frame = ttk.LabelFrame(main_frame, text="Race Setup")  
-        setup_frame.pack(fill=tk.X, pady=5)
+        # Race Setup Section
+        setup_outer = tk.Frame(left_frame, bg=UNIFIED_BG, relief="solid", bd=1)
+        setup_outer.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        setup_label = tk.Label(setup_outer, text="⚙️  Race Setup", 
+                            bg=UNIFIED_BG, fg="#f57c00", 
+                            font=HEADING_FONT, anchor="w")
+        setup_label.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        setup_content = tk.Frame(setup_outer, bg=UNIFIED_BG)
+        setup_content.pack(fill=tk.BOTH, expand=True, padx=15, pady=(5, 15))
 
         # Top row - Database management and lap configuration
-        top_controls_frame = ttk.Frame(setup_frame)
-        top_controls_frame.pack(fill=tk.X, padx=5, pady=5)
+        top_controls_frame = tk.Frame(setup_content, bg=UNIFIED_BG)
+        top_controls_frame.pack(fill=tk.X, pady=5)
         
         # Racer management button
         self.racer_mgr_button = ttk.Button(top_controls_frame, text="Manage Racer Database", 
-                                     command=self.open_racer_manager)  
+                                        command=self.open_racer_manager)
         self.racer_mgr_button.pack(side=tk.LEFT, padx=(0, 20))
 
-        # Number of laps section with SET BUTTON
-        lap_frame = ttk.Frame(top_controls_frame)
+        # Number of laps section
+        lap_frame = tk.Frame(top_controls_frame, bg=UNIFIED_BG)
         lap_frame.pack(side=tk.LEFT)
         
-        ttk.Label(lap_frame, text="Laps:").pack(side=tk.LEFT, padx=(0, 5))  
+        tk.Label(lap_frame, text="Laps:", bg=UNIFIED_BG, font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 5))
         self.lap_var = tk.StringVar(value=str(DEFAULT_NUM_LAPS))
         self.lap_spinbox = ttk.Spinbox(lap_frame, from_=1, to=100, textvariable=self.lap_var, width=5)
         self.lap_spinbox.pack(side=tk.LEFT, padx=(0, 5))
@@ -110,9 +150,9 @@ class RFIDTagMonitor:
         self.set_laps_btn = ttk.Button(lap_frame, text="Set Laps", command=self.set_laps)
         self.set_laps_btn.pack(side=tk.LEFT, padx=5)
 
-        # Racer selection section (two columns)
-        racer_selection_frame = ttk.Frame(setup_frame)
-        racer_selection_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
+        # Racer selection section
+        racer_selection_frame = tk.Frame(setup_content, bg=UNIFIED_BG)
+        racer_selection_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 5))
 
         # Left sub-frame - Available racers
         available_frame = ttk.LabelFrame(racer_selection_frame, text="Available Racers")
@@ -132,14 +172,12 @@ class RFIDTagMonitor:
         available_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
         
         self.available_racers_tree = ttk.Treeview(available_tree_frame, 
-                                                columns=("name", "tag"), 
+                                                columns=("name",), 
                                                 show="headings", 
                                                 selectmode="browse",
                                                 height=6)
         self.available_racers_tree.heading("name", text="Name")
-        self.available_racers_tree.heading("tag", text="Tag")
-        self.available_racers_tree.column("name", width=120)
-        self.available_racers_tree.column("tag", width=100)
+        self.available_racers_tree.column("name", width=220)
 
         available_scrollbar = ttk.Scrollbar(available_tree_frame, orient="vertical", command=self.available_racers_tree.yview)
         self.available_racers_tree.configure(yscrollcommand=available_scrollbar.set)
@@ -162,14 +200,12 @@ class RFIDTagMonitor:
         roster_tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         self.race_roster_tree = ttk.Treeview(roster_tree_frame, 
-                                           columns=("name", "tag"), 
-                                           show="headings", 
-                                           selectmode="browse",
-                                           height=6)
+                                        columns=("name",), 
+                                        show="headings", 
+                                        selectmode="browse",
+                                        height=6)
         self.race_roster_tree.heading("name", text="Name")
-        self.race_roster_tree.heading("tag", text="Tag")
-        self.race_roster_tree.column("name", width=120)
-        self.race_roster_tree.column("tag", width=100)
+        self.race_roster_tree.column("name", width=220)
 
         roster_scrollbar = ttk.Scrollbar(roster_tree_frame, orient="vertical", command=self.race_roster_tree.yview)
         self.race_roster_tree.configure(yscrollcommand=roster_scrollbar.set)
@@ -177,121 +213,127 @@ class RFIDTagMonitor:
         self.race_roster_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         roster_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Remove button (NO race info here anymore)
+        # Remove button
         remove_button_frame = ttk.Frame(roster_frame)
         remove_button_frame.pack(fill=tk.X, padx=5, pady=5)
         self.remove_racer_btn = ttk.Button(remove_button_frame, text="← Remove from Race", command=self.remove_racer_from_race)
         self.remove_racer_btn.pack()
 
-        # ==== RACE TIMER SECTION (NOW HORIZONTAL AND PROMINENT) ====
-        timer_frame = ttk.LabelFrame(main_frame, text="Race Timer")  
-        timer_frame.pack(fill=tk.X, pady=5)
+        # === RIGHT HALF CONTENT ===
 
-        # Create horizontal layout for timer content
-        timer_content_frame = ttk.Frame(timer_frame)
-        timer_content_frame.pack(fill=tk.X, padx=15, pady=15)
+        # Race Timer Section
+        timer_outer = tk.Frame(right_frame, bg=UNIFIED_BG, relief="solid", bd=1)
+        timer_outer.pack(fill=tk.X, pady=(0, 5))
+        
+        timer_label = tk.Label(timer_outer, text="⏰  Race Timer", 
+                            bg=UNIFIED_BG, fg="#2e7d32", 
+                            font=HEADING_FONT, anchor="w")
+        timer_label.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        timer_content_frame = tk.Frame(timer_outer, bg=UNIFIED_BG)
+        timer_content_frame.pack(fill=tk.X, padx=15, pady=(5, 15))
 
-        # LEFT SIDE - Timer display and race info
-        timer_display_frame = ttk.Frame(timer_content_frame)
-        timer_display_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Configure grid weights to make 3 equal columns
+        timer_content_frame.grid_columnconfigure(0, weight=1)
+        timer_content_frame.grid_columnconfigure(1, weight=1) 
+        timer_content_frame.grid_columnconfigure(2, weight=1)
+
+        # LEFT THIRD - Timer display and race info
+        timer_display_frame = tk.Frame(timer_content_frame, bg=UNIFIED_BG)
+        timer_display_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         # Race status indicator and timer in same row
-        timer_row_frame = ttk.Frame(timer_display_frame)
+        timer_row_frame = tk.Frame(timer_display_frame, bg=UNIFIED_BG)
         timer_row_frame.pack(anchor=tk.W, fill=tk.X)
 
-        # Race status indicator (traffic light style)
-        self.race_status_frame = ttk.Frame(timer_row_frame)
+        # Race status indicator
+        self.race_status_frame = tk.Frame(timer_row_frame, bg=UNIFIED_BG)
         self.race_status_frame.pack(side=tk.LEFT, padx=(0, 15))
 
-        self.race_status_indicator = tk.Canvas(self.race_status_frame, width=20, height=20, highlightthickness=0)
+        self.race_status_indicator = tk.Canvas(self.race_status_frame, width=20, height=20, 
+                                            highlightthickness=0, bg=UNIFIED_BG)
         self.race_status_indicator.pack()
-        
+
         # Create the status circle (red = stopped, green = racing)
         self.status_circle = self.race_status_indicator.create_oval(2, 2, 18, 18, 
-                                                                   fill="#e74c3c", outline="#c0392b", width=2)
+                                                                fill="#e74c3c", outline="#c0392b", width=2)
 
         # Large timer display
-        self.timer_display = ttk.Label(timer_row_frame, text="0:00:00.000", font=("Arial", 28, "bold"))  
+        self.timer_display = tk.Label(timer_row_frame, text="00:00.00", 
+                                    font=("Consolas", 28, "bold"), bg=UNIFIED_BG, fg="#2c3e50")
         self.timer_display.pack(side=tk.LEFT, anchor=tk.W)
 
-        # Race info moved HERE from roster section
-        self.race_info_label = ttk.Label(timer_display_frame, text="0 racers in race, 3 laps", 
-                                       font=("Arial", 12, "bold"), foreground="#2c3e50")
+        # Race info
+        self.race_info_label = tk.Label(timer_display_frame, text="0 racers in race, 3 laps", 
+                                    font=("Arial", 12, "bold"), fg="#2c3e50", bg=UNIFIED_BG)
         self.race_info_label.pack(anchor=tk.W, pady=(5, 0))
 
-        # MIDDLE - Race control buttons with styling
-        control_frame = ttk.Frame(timer_content_frame)
-        control_frame.pack(side=tk.LEFT, padx=30)
+        # MIDDLE THIRD - Race control buttons
+        control_frame = tk.Frame(timer_content_frame, bg=UNIFIED_BG)
+        control_frame.grid(row=0, column=1, sticky="nsew", padx=10)
 
-        ttk.Label(control_frame, text="Race Controls", font=("Arial", 10, "bold")).pack(pady=(0, 5))
-
-        # Create a frame for styled buttons
-        button_style_frame = ttk.Frame(control_frame)
-        button_style_frame.pack()
+        tk.Label(control_frame, text="Race Controls", font=("Arial", 11, "bold"), 
+                bg=UNIFIED_BG, fg="#2c3e50").pack(pady=(0, 10))
 
         # Start button with green styling
-        self.start_button = tk.Button(button_style_frame, 
+        self.start_button = tk.Button(control_frame, 
                                     text="▶ Start Race", 
                                     command=self.start_race, 
                                     state=tk.DISABLED,
                                     width=12,
                                     font=("Arial", 10, "bold"),
-                                    bg="#27ae60",  # Green background
-                                    fg="white",    # White text
-                                    activebackground="#2ecc71",  # Lighter green when pressed
-                                    activeforeground="white",
-                                    relief="raised",
-                                    bd=2)
-        self.start_button.pack(pady=2)
+                                    bg="#27ae60", fg="white",
+                                    activebackground="#2ecc71", activeforeground="white",
+                                    relief="raised", bd=2)
+        self.start_button.pack(pady=3)
 
         # Stop button with red styling  
-        self.stop_button = tk.Button(button_style_frame, 
-                                   text="⏹ Stop Race", 
-                                   command=self.stop_race, 
-                                   state=tk.DISABLED,
-                                   width=12,
-                                   font=("Arial", 10, "bold"),
-                                   bg="#e74c3c",  # Red background
-                                   fg="white",    # White text
-                                   activebackground="#c0392b",  # Darker red when pressed
-                                   activeforeground="white",
-                                   relief="raised",
-                                   bd=2)
-        self.stop_button.pack(pady=2)  
+        self.stop_button = tk.Button(control_frame, 
+                                text="⏹ Stop Race", 
+                                command=self.stop_race, 
+                                state=tk.DISABLED,
+                                width=12,
+                                font=("Arial", 10, "bold"),
+                                bg="#e74c3c", fg="white",
+                                activebackground="#c0392b", activeforeground="white",
+                                relief="raised", bd=2)
+        self.stop_button.pack(pady=3)
 
-        # RIGHT SIDE - Web server controls
-        web_server_frame = ttk.Frame(timer_content_frame)
-        web_server_frame.pack(side=tk.RIGHT, padx=30)
+        # RIGHT THIRD - Web server controls
+        web_server_frame = tk.Frame(timer_content_frame, bg=UNIFIED_BG)
+        web_server_frame.grid(row=0, column=2, sticky="nsew", padx=(10, 0))
 
-        ttk.Label(web_server_frame, text="Web Display", font=("Arial", 10, "bold")).pack(pady=(0, 5))
+        tk.Label(web_server_frame, text="Web Display", font=("Arial", 11, "bold"), 
+                bg=UNIFIED_BG, fg="#2c3e50").pack(pady=(0, 10))
 
-        self.web_server_btn = ttk.Button(
-            web_server_frame,
-            text="Start Web Display",
-            command=self.toggle_web_server,
-            width=15
-        )
-        self.web_server_btn.pack(pady=2)
+        self.web_server_btn = ttk.Button(web_server_frame, text="Start Web Display", 
+                                    command=self.toggle_web_server, width=15)
+        self.web_server_btn.pack(pady=3)
 
-        self.web_url_label = ttk.Label(web_server_frame, text="Web display not running", 
-                                     wraplength=180, font=("Arial", 8), foreground="gray")
-        self.web_url_label.pack(pady=2)
-    
-        # Race Results frame (unchanged)
-        results_frame = ttk.LabelFrame(main_frame, text="Race Results")
-        results_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-    
+        self.web_url_label = tk.Label(web_server_frame, text="Web display not running", 
+                                    wraplength=180, font=("Arial", 8), fg="gray", bg=UNIFIED_BG)
+        self.web_url_label.pack(pady=3)
+
+        # Race Results
+        results_outer = tk.Frame(right_frame, bg=UNIFIED_BG, relief="solid", bd=1)
+        results_outer.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
+        
+        results_label = tk.Label(results_outer, text="🏆  Race Results", 
+                                bg=UNIFIED_BG, fg="#d32f2f", 
+                                font=HEADING_FONT, anchor="w")
+        results_label.pack(fill=tk.X, padx=10, pady=(10, 5))
+
         # Results notebook
-        self.results_notebook = ttk.Notebook(results_frame)
-        self.results_notebook.pack(fill=tk.BOTH, expand=True)
-    
+        self.results_notebook = ttk.Notebook(results_outer)
+        self.results_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(5, 15))
+
         # Standings tab
         standings_frame = ttk.Frame(self.results_notebook)
         self.results_notebook.add(standings_frame, text="Standings")
 
         self.standings_tree = ttk.Treeview(standings_frame, 
-                                   columns=("position", "racer", "laps", "gap", "best_lap_time", "last_lap_time", "total_time"), 
-                                   show="headings")
+                                columns=("position", "racer", "laps", "gap", "best_lap_time", "last_lap_time", "total_time"), 
+                                show="headings")
         self.standings_tree["columns"] = ("position", "racer", "laps", "gap", "best_lap_time", "last_lap_time", "total_time")
         self.standings_tree.column("#0", width=0, stretch=tk.NO)
         for column in self.standings_tree["columns"]:
@@ -307,35 +349,32 @@ class RFIDTagMonitor:
 
         results_scrollbar = ttk.Scrollbar(standings_frame, orient="vertical", command=self.standings_tree.yview)
         self.standings_tree.configure(yscrollcommand=results_scrollbar.set)
-    
+
         self.standings_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         results_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    
+
         # Lap Times tab
         lap_times_frame = ttk.Frame(self.results_notebook)
         self.results_notebook.add(lap_times_frame, text="Lap Times")
-    
+
         self.lap_times_tree = ttk.Treeview(lap_times_frame, 
-                                      columns=("racer", "lap", "lap_time", "total_time"), 
-                                      show="headings")
+                                    columns=("racer", "lap", "lap_time", "total_time"), 
+                                    show="headings")
         self.lap_times_tree.heading("racer", text="Racer")
         self.lap_times_tree.heading("lap", text="Lap")
         self.lap_times_tree.heading("lap_time", text="Lap Time")
         self.lap_times_tree.heading("total_time", text="Total Time")
-    
+
         self.lap_times_tree.column("racer", width=200)
         self.lap_times_tree.column("lap", width=50)
         self.lap_times_tree.column("lap_time", width=100)
         self.lap_times_tree.column("total_time", width=100)
-    
+
         lap_times_scrollbar = ttk.Scrollbar(lap_times_frame, orient="vertical", command=self.lap_times_tree.yview)
         self.lap_times_tree.configure(yscrollcommand=lap_times_scrollbar.set)
-    
+
         self.lap_times_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         lap_times_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Initialize empty lists - will be populated after racer_manager is created
-
     def update_race_status_indicator(self, racing=False):
         """Update the race status indicator color"""
         if racing:
