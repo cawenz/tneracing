@@ -25,17 +25,16 @@ class RaceTimer:
         if not self.is_running: 
             return
         elapsed_time = time.time() - self.start_time 
-        time_str = self.format_time(elapsed_time)
-        self.monitor.update_timer_display(time_str) # Calls a method on the main UI
+        time_str = RaceTimer.format_time(elapsed_time)  # Use the static method
+        self.monitor.update_timer_display(time_str)
         self.timer_id = self.monitor.root.after(100, self.update_display)
 
     @staticmethod
     def format_time(seconds):
-        """Format time in H:MM:SS.ss format"""
-        hours = int(seconds // 3600) 
-        minutes = int((seconds % 3600) // 60) 
-        seconds = seconds % 60 
-        return f"{hours}:{minutes:02d}:{seconds:06.3f}"
+        """Format time in MM:SS.00 format"""
+        minutes = int(seconds // 60)
+        seconds = seconds % 60
+        return f"{minutes:02d}:{seconds:05.2f}"
     
     @staticmethod
     def format_total_time(seconds):

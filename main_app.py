@@ -28,7 +28,7 @@ class RFIDTagMonitor:
 
         # Setup the user interface FIRST
         self.setup_ui()
-        
+
         # THEN create the racer manager after UI is set up
         self.racer_manager = RacerManager(root, self) 
         
@@ -73,11 +73,11 @@ class RFIDTagMonitor:
         status_outer = tk.Frame(left_frame, bg=UNIFIED_BG, relief="solid", bd=1)
         status_outer.pack(fill=tk.X, pady=(0, 10))
         
-        status_label_frame = tk.Label(status_outer, text="📢  Message Center", 
-                                    bg=UNIFIED_BG, fg="#1e88e5", 
-                                    font=HEADING_FONT, anchor="w")
-        status_label_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
-        
+        status_header_frame = tk.Frame(status_outer, bg=UNIFIED_BG)
+        status_header_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        tk.Label(status_header_frame, text="📢", font=HEADING_FONT, bg=UNIFIED_BG, fg="#1e88e5").pack(side=tk.LEFT)
+        tk.Label(status_header_frame, text="  Message Center", font=HEADING_FONT, bg=UNIFIED_BG, fg="black").pack(side=tk.LEFT)
+                
         self.status_label = tk.Label(status_outer, text="Starting application...", 
                                 font=("Arial", 11), fg="#2c3e50", bg=UNIFIED_BG, anchor="w")
         self.status_label.pack(fill=tk.X, padx=15, pady=(0, 15))
@@ -86,11 +86,11 @@ class RFIDTagMonitor:
         connection_outer = tk.Frame(left_frame, bg=UNIFIED_BG, relief="solid", bd=1)
         connection_outer.pack(fill=tk.X, pady=5)
         
-        conn_label = tk.Label(connection_outer, text="🔗  RFID Reader Connection", 
-                            bg=UNIFIED_BG, fg="#7b1fa2", 
-                            font=HEADING_FONT, anchor="w")
-        conn_label.pack(fill=tk.X, padx=10, pady=(10, 5))
-        
+        conn_header_frame = tk.Frame(connection_outer, bg=UNIFIED_BG)
+        conn_header_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        tk.Label(conn_header_frame, text="🔗", font=HEADING_FONT, bg=UNIFIED_BG, fg="#7b1fa2").pack(side=tk.LEFT)
+        tk.Label(conn_header_frame, text="  RFID Reader Connection", font=HEADING_FONT, bg=UNIFIED_BG, fg="black").pack(side=tk.LEFT)
+                
         conn_content = tk.Frame(connection_outer, bg=UNIFIED_BG)
         conn_content.pack(fill=tk.X, padx=15, pady=(5, 15))
 
@@ -121,11 +121,11 @@ class RFIDTagMonitor:
         setup_outer = tk.Frame(left_frame, bg=UNIFIED_BG, relief="solid", bd=1)
         setup_outer.pack(fill=tk.BOTH, expand=True, pady=5)
         
-        setup_label = tk.Label(setup_outer, text="⚙️  Race Setup", 
-                            bg=UNIFIED_BG, fg="#f57c00", 
-                            font=HEADING_FONT, anchor="w")
-        setup_label.pack(fill=tk.X, padx=10, pady=(10, 5))
-        
+        setup_header_frame = tk.Frame(setup_outer, bg=UNIFIED_BG)
+        setup_header_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        tk.Label(setup_header_frame, text="🔧", font=HEADING_FONT, bg=UNIFIED_BG, fg="#4b3e30").pack(side=tk.LEFT)
+        tk.Label(setup_header_frame, text="  Race Setup", font=HEADING_FONT, bg=UNIFIED_BG, fg="black").pack(side=tk.LEFT)
+                
         setup_content = tk.Frame(setup_outer, bg=UNIFIED_BG)
         setup_content.pack(fill=tk.BOTH, expand=True, padx=15, pady=(5, 15))
 
@@ -225,11 +225,11 @@ class RFIDTagMonitor:
         timer_outer = tk.Frame(right_frame, bg=UNIFIED_BG, relief="solid", bd=1)
         timer_outer.pack(fill=tk.X, pady=(0, 5))
         
-        timer_label = tk.Label(timer_outer, text="⏰  Race Timer", 
-                            bg=UNIFIED_BG, fg="#2e7d32", 
-                            font=HEADING_FONT, anchor="w")
-        timer_label.pack(fill=tk.X, padx=10, pady=(10, 5))
-        
+        timer_header_frame = tk.Frame(timer_outer, bg=UNIFIED_BG)
+        timer_header_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        tk.Label(timer_header_frame, text="⏰", font=HEADING_FONT, bg=UNIFIED_BG, fg="#2e7d32").pack(side=tk.LEFT)
+        tk.Label(timer_header_frame, text="  Race Timer", font=HEADING_FONT, bg=UNIFIED_BG, fg="black").pack(side=tk.LEFT)
+                
         timer_content_frame = tk.Frame(timer_outer, bg=UNIFIED_BG)
         timer_content_frame.pack(fill=tk.X, padx=15, pady=(5, 15))
 
@@ -264,7 +264,7 @@ class RFIDTagMonitor:
         self.timer_display.pack(side=tk.LEFT, anchor=tk.W)
 
         # Race info
-        self.race_info_label = tk.Label(timer_display_frame, text="0 racers in race, 3 laps", 
+        self.race_info_label = tk.Label(timer_display_frame, text="0 racers, 3 laps", 
                                     font=("Arial", 12, "bold"), fg="#2c3e50", bg=UNIFIED_BG)
         self.race_info_label.pack(anchor=tk.W, pady=(5, 0))
 
@@ -318,10 +318,10 @@ class RFIDTagMonitor:
         results_outer = tk.Frame(right_frame, bg=UNIFIED_BG, relief="solid", bd=1)
         results_outer.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
         
-        results_label = tk.Label(results_outer, text="🏆  Race Results", 
-                                bg=UNIFIED_BG, fg="#d32f2f", 
-                                font=HEADING_FONT, anchor="w")
-        results_label.pack(fill=tk.X, padx=10, pady=(10, 5))
+        results_header_frame = tk.Frame(results_outer, bg=UNIFIED_BG)
+        results_header_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        tk.Label(results_header_frame, text="🏆", font=HEADING_FONT, bg=UNIFIED_BG, fg="#c29b0c").pack(side=tk.LEFT)
+        tk.Label(results_header_frame, text="  Race Results", font=HEADING_FONT, bg=UNIFIED_BG, fg="black").pack(side=tk.LEFT)
 
         # Results notebook
         self.results_notebook = ttk.Notebook(results_outer)
@@ -500,7 +500,7 @@ class RFIDTagMonitor:
             self.lap_var.set(str(shared_state.num_laps))
             
         num_racers = len(shared_state.ALLOWED_TAGS)
-        self.race_info_label.config(text=f"{num_racers} racers in race, {shared_state.num_laps} laps")
+        self.race_info_label.config(text=f"{num_racers} racers, {shared_state.num_laps} laps")
 
     def update_selected_racers(self, selected_racers_list):
         """Legacy method - no longer used with new UI"""
@@ -656,7 +656,7 @@ class RFIDTagMonitor:
     def update_race_info(self):
         """Update the race info label"""
         num_racers = len(shared_state.ALLOWED_TAGS)
-        self.race_info_label.config(text=f"{num_racers} racers in race, {shared_state.num_laps} laps")
+        self.race_info_label.config(text=f"{num_racers} racers, {shared_state.num_laps} laps")
 
     def start_race(self):
         """Start the race"""
