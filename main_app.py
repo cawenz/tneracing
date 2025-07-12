@@ -273,31 +273,42 @@ class RFIDTagMonitor:
         control_frame.grid(row=0, column=1, sticky="nsew", padx=10)
 
         tk.Label(control_frame, text="Race Controls", font=("Arial", 11, "bold"), 
-                bg=UNIFIED_BG, fg="#2c3e50").pack(pady=(0, 10))
+            bg=UNIFIED_BG, fg="#2c3e50").pack(pady=(0, 10))
 
-        # Start button with green styling
+        # Start button
         self.start_button = tk.Button(control_frame, 
-                                    text="▶ Start Race", 
-                                    command=self.start_race, 
-                                    state=tk.DISABLED,
-                                    width=12,
-                                    font=("Arial", 10, "bold"),
-                                    bg="#27ae60", fg="white",
-                                    activebackground="#2ecc71", activeforeground="white",
-                                    relief="raised", bd=2)
-        self.start_button.pack(pady=3)
+                            text="▶ Start Race", 
+                            command=self.start_race, 
+                            state=tk.DISABLED,
+                            width=12,
+                            font=("Arial", 10, "bold"),
+                            bg="#27ae60", fg="white",
+                            activebackground="#2ecc71", activeforeground="white",
+                            relief="raised", bd=2)
+        self.start_button.pack(pady=2)
 
-        # Stop button with red styling  
+        # Stop button
         self.stop_button = tk.Button(control_frame, 
-                                text="⏹ Stop Race", 
-                                command=self.stop_race, 
-                                state=tk.DISABLED,
-                                width=12,
-                                font=("Arial", 10, "bold"),
-                                bg="#e74c3c", fg="white",
-                                activebackground="#c0392b", activeforeground="white",
-                                relief="raised", bd=2)
-        self.stop_button.pack(pady=3)
+                        text="⏹ Stop Race", 
+                        command=self.stop_race, 
+                        state=tk.DISABLED,
+                        width=12,
+                        font=("Arial", 10, "bold"),
+                        bg="#e74c3c", fg="white",
+                        activebackground="#c0392b", activeforeground="white",
+                        relief="raised", bd=2)
+        self.stop_button.pack(pady=2)
+
+        # Reset button
+        self.reset_button = tk.Button(control_frame, 
+                        text="🔄 Reset", 
+                        command=self.reset_race, 
+                        width=12,
+                        font=("Arial", 10, "bold"),
+                        bg="#95a5a6", fg="white",
+                        activebackground="#7f8c8d", activeforeground="white",
+                        relief="raised", bd=2)
+        self.reset_button.pack(pady=2)
 
         # RIGHT THIRD - Web server controls
         web_server_frame = tk.Frame(timer_content_frame, bg=UNIFIED_BG)
@@ -1063,6 +1074,46 @@ class RFIDTagMonitor:
                 continue
                 
             self.available_racers_tree.insert("", tk.END, values=(name, racer.get('tag', '')))
+
+    def show_race_ended(self):
+        """Show visual indicators that the race has ended"""
+        # Update message center
+        self.update_status("🏁 Race Finished! All racers have completed the race.", is_error=False)
+    
+        # Update timer display to show "RACE FINISHED"
+        self.timer_display.config(text="RACE FINISHED", fg="#e74c3c", font=("Consolas", 20, "bold"))
+    
+        # Change status indicator to yellow/gold for finished
+        self.race_status_indicator.itemconfig(self.status_circle, 
+                                        fill="#f39c12", outline="#e67e22")
+
+    def reset_race(self):
+        """Reset everything to default state"""
+    # Stop race if running
+        if shared_state.race_active:
+            self.stop_race()
+    
+    # Clear race data
+        shared_state.ALLOWED_TAGS = []
+        shared_state.racers_data = {}
+        shared_state.num_laps = DEFAULT_NUM_LAPS
+        
+        # Reset UI elements
+        self.lap_var.set(str(DEFAULT_NUM_LAPS))
+        self.timer_display.config(text="00:00.00", fg="#2c3e50", font=("Consolas", 28, "bold"))
+        self.update_race_status_indicator(racing=False)
+        
+        # Clear results trees
+        for item in self.standings_tree.get_children():
+            self.standings_tree.delete(item)
+        for item in self.lap_times_tree.get_children():
+            self.lap_times_tree.delete(item)
+        
+        # Refresh UI
+        self.refresh_race_roster()
+        self.refresh_racer_list()
+        self.update_race_info()
+        self.update_status("Race data reset. Ready to set up a new race.")
 
 if __name__ == "__main__":
     try:
