@@ -236,7 +236,6 @@ class RFIDTagMonitor:
         # Configure grid weights to make 3 equal columns
         timer_content_frame.grid_columnconfigure(0, weight=1)
         timer_content_frame.grid_columnconfigure(1, weight=1) 
-        timer_content_frame.grid_columnconfigure(2, weight=1)
 
         # LEFT THIRD - Timer display and race info
         timer_display_frame = tk.Frame(timer_content_frame, bg=UNIFIED_BG)
@@ -270,7 +269,7 @@ class RFIDTagMonitor:
 
         # MIDDLE THIRD - Race control buttons
         control_frame = tk.Frame(timer_content_frame, bg=UNIFIED_BG)
-        control_frame.grid(row=0, column=1, sticky="nsew", padx=10)
+        control_frame.grid(row=0, column=1, sticky="nsew", padx=(10,0))
 
         tk.Label(control_frame, text="Race Controls", font=("Arial", 11, "bold"), 
             bg=UNIFIED_BG, fg="#2c3e50").pack(pady=(0, 10))
@@ -310,21 +309,6 @@ class RFIDTagMonitor:
                         relief="raised", bd=2)
         self.reset_button.pack(pady=2)
 
-        # RIGHT THIRD - Web server controls
-        web_server_frame = tk.Frame(timer_content_frame, bg=UNIFIED_BG)
-        web_server_frame.grid(row=0, column=2, sticky="nsew", padx=(10, 0))
-
-        tk.Label(web_server_frame, text="Web Display", font=("Arial", 11, "bold"), 
-                bg=UNIFIED_BG, fg="#2c3e50").pack(pady=(0, 10))
-
-        self.web_server_btn = ttk.Button(web_server_frame, text="Start Web Display", 
-                                    command=self.toggle_web_server, width=15)
-        self.web_server_btn.pack(pady=3)
-
-        self.web_url_label = tk.Label(web_server_frame, text="Web display not running", 
-                                    wraplength=180, font=("Arial", 8), fg="gray", bg=UNIFIED_BG)
-        self.web_url_label.pack(pady=3)
-
         # Race Results
         results_outer = tk.Frame(right_frame, bg=UNIFIED_BG, relief="solid", bd=1)
         results_outer.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
@@ -335,8 +319,25 @@ class RFIDTagMonitor:
         tk.Label(results_header_frame, text="  Race Results", font=HEADING_FONT, bg=UNIFIED_BG, fg="black").pack(side=tk.LEFT)
 
         # Results notebook
+            # Web server controls row
+        web_controls_frame = tk.Frame(results_outer, bg=UNIFIED_BG)
+        web_controls_frame.pack(fill=tk.X, padx=10, pady=(5, 10))
+
+        self.web_server_btn = ttk.Button(web_controls_frame, text="Start Web Display", 
+                                    command=self.toggle_web_server)
+        self.web_server_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        self.copy_url_btn = ttk.Button(web_controls_frame, text="📋 Copy URL", 
+                                    command=self.copy_web_url, state=tk.DISABLED)
+        self.copy_url_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        self.web_url_label = tk.Label(web_controls_frame, text="Web display not running", 
+                                    font=("Arial", 9), fg="gray", bg=UNIFIED_BG)
+        self.web_url_label.pack(side=tk.LEFT, padx=(10, 0))
+
+        # Results notebook
         self.results_notebook = ttk.Notebook(results_outer)
-        self.results_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(5, 15))
+        self.results_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 15))
 
         # Standings tab
         standings_frame = ttk.Frame(self.results_notebook)
@@ -538,12 +539,11 @@ class RFIDTagMonitor:
                     text=f"Web display running at: {url}",
                     foreground="blue"
             )
+                self.copy_url_btn.config(state=tk.NORMAL)
+                
             
             # Show a message to the user
-                messagebox.showinfo(
-                    "Web Display Started",
-                    f"Web display has been started!\n\nSpectators can view race results at:\n{url}"
-                )
+                
                 self.update_status(f"Web display started at {url}")
             else:
              messagebox.showerror(
@@ -559,6 +559,7 @@ class RFIDTagMonitor:
                     text="Web display not running",
                     foreground="gray"
                 )
+                self.copy_url_btn.config(state=tk.DISABLED)
                 self.update_status("Web display stopped")
             else:
                 messagebox.showerror(
@@ -1114,6 +1115,16 @@ class RFIDTagMonitor:
         self.refresh_racer_list()
         self.update_race_info()
         self.update_status("Race data reset. Ready to set up a new race.")
+
+    def copy_web_url(self):
+        """Copy the web server URL to clipboard"""
+        if self.web_server_running:
+            from web_server import get_server_url
+            url = get_server_url()
+            self.root.clipboard_clear()
+            self.root.clipboard_append(url)
+            self.update_status(f"URL copied to clipboard: {url}")
+
 
 if __name__ == "__main__":
     try:
