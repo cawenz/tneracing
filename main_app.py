@@ -19,24 +19,24 @@ from web_server import start_server, stop_server, get_server_url
 class RFIDTagMonitor:
     def __init__(self, root):
         self.root = root
-        self.race_timer = RaceTimer(self) # Pass 'self' (RFIDTagMonitor instance) to RaceTimer  
-        # Pass references to shared_state and self.race_timer to RaceResultsExporter
-        self.results_exporter = RaceResultsExporter(shared_state, self.race_timer) # New line for exporter
-        # Set the reference to this monitor instance for the RFID reader module
+        self.race_timer = RaceTimer(self)
+        self.results_exporter = RaceResultsExporter(shared_state, self.race_timer)
         set_monitor_reference(self)
         self.web_server_running = False
 
         # Setup the user interface FIRST
         self.setup_ui()
 
-        # THEN create the racer manager after UI is set up
-        self.racer_manager = RacerManager(root, self) 
+        # FIXED: Create the racer manager AFTER UI is set up, but don't create its window yet
+        self.racer_manager = RacerManager(root, self)
         
-        # NOW we can safely refresh the racer list
+        # Load the racer data immediately (this doesn't create the UI window)
+        self.racer_manager.load_racers()
+        
+        # NOW we can safely refresh the racer list in the main UI
         self.refresh_racer_list()
         
         self.update_status("Application started. Please connect to reader and set up the race...")
-        # Handle window close 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.update_results()
 
@@ -615,8 +615,18 @@ class RFIDTagMonitor:
             self.start_button.config(state=tk.NORMAL)  
 
     def open_racer_manager(self):
-        """Open the racer manager window"""
-        self.racer_manager.show()  
+        """Open the racer manager window - FIXED VERSION"""
+        try:
+            logger.info("Opening racer manager...")
+            self.update_status("Opening racer database...")
+            
+            # Use the show method which will create the window if needed
+            self.racer_manager.show()
+            
+        except Exception as e:
+            logger.error(f"Error opening racer manager: {e}", exc_info=True)
+            self.update_status(f"Error opening racer manager: {e}", is_error=True)
+            messagebox.showerror("Error", f"Could not open racer manager:\n{e}") 
 
     def update_selected_racers(self, selected_racers_list):
         """
@@ -1047,34 +1057,38 @@ class RFIDTagMonitor:
             self.lap_var.set(str(shared_state.num_laps))
 
     def refresh_racer_list(self):
-        """Refresh the available racers list"""
-        # Check if racer_manager exists yet (it won't during initial setup)
-        if not hasattr(self, 'racer_manager'):
-            return
+        """Refresh the available racers list - IMPROVED VERSION"""
+        try:
+            # Check if racer_manager exists and has data
+            if not hasattr(self, 'racer_manager') or not self.racer_manager:
+                return
             
-        # Clear the available racers tree
-        for item in self.available_racers_tree.get_children():
-            self.available_racers_tree.delete(item)
-        
-        # Get all racers from the racer manager
-        all_racers = self.racer_manager.get_all_racers()
-        
-        # Filter based on search term
-        search_term = self.racer_search_var.get().lower()
-        
-        for racer in all_racers:
-            # Skip racers already in the race
-            tag = str(racer.get('tag', '')).strip().lower()
-            if tag in shared_state.ALLOWED_TAGS:
-                continue
-                
-            name = f"{racer.get('first_name', '')} {racer.get('last_name', '')}"
+            # Clear the available racers tree
+            for item in self.available_racers_tree.get_children():
+                self.available_racers_tree.delete(item)
             
-            # Apply search filter
-            if search_term and search_term not in name.lower() and search_term not in tag:
-                continue
+            # Get all racers from the racer manager
+            all_racers = self.racer_manager.get_all_racers()
+            
+            # Filter based on search term
+            search_term = self.racer_search_var.get().lower()
+            
+            for racer in all_racers:
+                # Skip racers already in the race
+                tag = str(racer.get('tag', '')).strip().lower()
+                if tag in shared_state.ALLOWED_TAGS:
+                    continue
+                    
+                name = f"{racer.get('first_name', '')} {racer.get('last_name', '')}"
                 
-            self.available_racers_tree.insert("", tk.END, values=(name, racer.get('tag', '')))
+                # Apply search filter
+                if search_term and search_term not in name.lower() and search_term not in tag:
+                    continue
+                    
+                self.available_racers_tree.insert("", tk.END, values=(name, racer.get('tag', '')))
+                
+        except Exception as e:
+            logger.error(f"Error refreshing racer list: {e}", exc_info=True)
 
     def show_race_ended(self):
         """Show visual indicators that the race has ended"""

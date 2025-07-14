@@ -1,4 +1,4 @@
-# racer_manager.py
+# racer_manager.py - FIXED VERSION
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -23,13 +23,30 @@ class RacerManager:
         self.monitor = monitor
         self.racers = []
         self.current_editing_id = None
+        self.window = None  # Initialize to None first
         
-        self.window = tk.Toplevel(parent)
+        # Don't create the window immediately - only when needed
+        # This prevents the circular dependency issue
+        
+    def create_window(self):
+        """Create the window only when needed"""
+        if self.window is not None:
+            return  # Window already exists
+            
+        self.window = tk.Toplevel(self.parent)
         self.window.title("Racer Database Management")
         self.window.geometry("900x700")
         self.window.protocol("WM_DELETE_WINDOW", self.hide)
-        self.window.transient(parent)
-        self.window.withdraw()
+        self.window.transient(self.parent)
+        self.window.withdraw()  # Start hidden
+
+        # Set window position relative to parent
+        try:
+            x = self.parent.winfo_x() + 50
+            y = self.parent.winfo_y() + 50
+            self.window.geometry(f"900x700+{x}+{y}")
+        except:
+            pass  # Use default position if parent position can't be determined
 
         main_frame = ttk.Frame(self.window, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -138,11 +155,15 @@ class RacerManager:
         bottom_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10)
         ttk.Button(bottom_frame, text="Close", command=self.hide).pack(side=tk.RIGHT, padx=5)
         
+        # Load racers and initialize
         self.load_racers()
         self.clear_form()
 
     def on_selection_change(self, event=None):
         """Update button states based on selection"""
+        if not self.window:
+            return
+            
         selected_items = self.racer_tree.selection()
         if len(selected_items) == 1:
             self.edit_btn.config(state="normal")
@@ -153,6 +174,9 @@ class RacerManager:
 
     def populate_form_for_edit(self):
         """Populate the form with selected racer data"""
+        if not self.window:
+            return
+            
         selected_items = self.racer_tree.selection()
         if len(selected_items) != 1: 
             return
@@ -171,6 +195,9 @@ class RacerManager:
     
     def clear_form(self):
         """Clear the form for new racer entry"""
+        if not self.window:
+            return
+            
         self.racer_id_var.set("(New Racer)")
         self.first_name_var.set("")
         self.last_name_var.set("")
@@ -185,6 +212,9 @@ class RacerManager:
     
     def filter_racer_list(self, *args):
         """Filter the racer list based on search term"""
+        if not self.window:
+            return
+            
         search_term = self.search_var.get().lower()
         for item in self.racer_tree.get_children(): 
             self.racer_tree.delete(item)
@@ -204,11 +234,15 @@ class RacerManager:
     def refresh_racer_list(self):
         """Refresh and sort the racer list"""
         self.racers.sort(key=lambda r: (r.get('last_name', '').lower(), r.get('first_name', '').lower()))
-        self.filter_racer_list()
+        if self.window:  # Only update if window exists
+            self.filter_racer_list()
         
         # Notify main app to refresh its racer list too
         if self.monitor and hasattr(self.monitor, 'refresh_racer_list'):
-            self.monitor.refresh_racer_list()
+            try:
+                self.monitor.refresh_racer_list()
+            except Exception as e:
+                logger.error(f"Error refreshing monitor racer list: {e}")
 
     def generate_new_user_id(self):
         """Generate a new unique user ID"""
@@ -220,6 +254,9 @@ class RacerManager:
 
     def save_racer(self):
         """Save the current racer"""
+        if not self.window:
+            return
+            
         first_name = self.first_name_var.get().strip()
         last_name = self.last_name_var.get().strip()
         tag = self.tag_var.get().strip()
@@ -268,6 +305,9 @@ class RacerManager:
 
     def delete_racer(self):
         """Delete the selected racer"""
+        if not self.window:
+            return
+            
         selected_items = self.racer_tree.selection()
         if not selected_items: 
             messagebox.showwarning("Selection Required", "Please select a racer to delete.", parent=self.window)
@@ -293,12 +333,20 @@ class RacerManager:
 
     def scan_for_tag(self):
         """Scan for an RFID tag"""
+        if not self.window:
+            return
+            
         self.window.config(cursor="watch")
         self.window.update()
-        tag_id = scan_single_rfid_tag()
-        self.window.config(cursor="")
-        if tag_id: 
-            self.tag_var.set(tag_id)
+        try:
+            tag_id = scan_single_rfid_tag()
+            if tag_id: 
+                self.tag_var.set(tag_id)
+        except Exception as e:
+            logger.error(f"Error scanning tag: {e}")
+            messagebox.showerror("Scan Error", f"Error scanning tag: {e}", parent=self.window)
+        finally:
+            self.window.config(cursor="")
 
     def load_racers(self):
         """Load racers from file"""
@@ -311,7 +359,10 @@ class RacerManager:
         except Exception as e: 
             logger.error(f"Error loading racers: {e}")
             self.racers = []
-        self.refresh_racer_list()
+        
+        # Only refresh list if window exists
+        if self.window:
+            self.refresh_racer_list()
 
     def save_racers_to_file(self):
         """Save racers to file"""
@@ -320,17 +371,49 @@ class RacerManager:
                 json.dump(self.racers, f, indent=4)
         except Exception as e:
             logger.error(f"Error saving racers: {e}")
-            messagebox.showerror("Save Error", f"Could not save racers to file: {e}", parent=self.window)
+            if self.window:
+                messagebox.showerror("Save Error", f"Could not save racers to file: {e}", parent=self.window)
 
     def get_all_racers(self):
         """Return all racers for use by main app"""
         return self.racers.copy()
 
     def show(self): 
-        self.load_racers()
-        self.window.deiconify()
-        self.window.grab_set()
+        """Show the racer manager window"""
+        try:
+            # Create window if it doesn't exist
+            if self.window is None:
+                self.create_window()
+            
+            # Load fresh data
+            self.load_racers()
+            
+            # Show the window
+            self.window.deiconify()
+            self.window.lift()  # Bring to front
+            self.window.focus_force()  # Give it focus
+            
+            # Use grab_set to make it modal (optional)
+            self.window.grab_set()
+            
+        except Exception as e:
+            logger.error(f"Error showing racer manager: {e}", exc_info=True)
+            messagebox.showerror("Error", f"Could not open racer manager: {e}")
         
     def hide(self): 
-        self.parent.grab_set()
-        self.window.withdraw()
+        """Hide the racer manager window"""
+        try:
+            if self.window:
+                # Release the grab before hiding
+                self.window.grab_release()
+                
+                # Return focus to parent
+                if self.parent:
+                    self.parent.grab_set()
+                    self.parent.focus_force()
+                
+                # Hide the window
+                self.window.withdraw()
+                
+        except Exception as e:
+            logger.error(f"Error hiding racer manager: {e}", exc_info=True)
