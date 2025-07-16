@@ -42,7 +42,9 @@ def update_race_data_cache():
                 "active": shared_state.race_active,
                 "elapsed": elapsed,
                 "elapsed_formatted": RaceTimer.format_time(elapsed),
-                "target_laps": shared_state.num_laps,  # Add this for status determination
+                "target_laps": shared_state.num_laps,
+                "race_mode": shared_state.race_mode,  # NEW
+                "race_mode_display": "Start Line Race" if shared_state.race_mode == shared_state.RACE_MODE_START_LINE else "Rolling Start",  # NEW
                 "racers": [],
                 "lap_times": []
             }
@@ -66,6 +68,15 @@ def update_race_data_cache():
             
             # Process each racer for display
             for racer in racers_list:
+                # Calculate racer's actual total race time based on mode
+                racer_total_time = "-"
+                if shared_state.race_mode == shared_state.RACE_MODE_ROLLING and racer.get("rolling_start_time") is not None and racer["lap_times_raw"]:
+                    total_seconds = racer["lap_times_raw"][-1] - racer["rolling_start_time"]
+                    racer_total_time = RaceTimer.format_total_time(total_seconds)
+                elif shared_state.race_mode == shared_state.RACE_MODE_START_LINE and racer.get("start_time") is not None and racer["lap_times_raw"]:
+                    total_seconds = racer["lap_times_raw"][-1] - racer["start_time"]
+                    racer_total_time = RaceTimer.format_total_time(total_seconds)
+                
                 # Format the gap (use the calculated gap from main app)
                 gap_display = racer["calculated_gap"]
                 
@@ -93,23 +104,29 @@ def update_race_data_cache():
                     "name": racer["name"],
                     "laps": racer["laps"],
                     "position": racer["position"],
-                    "finished": racer.get("finished", False),  # Add finished status
-                    "target_laps": shared_state.num_laps,      # Add target laps for comparison
+                    "finished": racer.get("finished", False),
+                    "target_laps": shared_state.num_laps,
                     "gap": gap_display,
                     "best_lap": best_lap_display,
                     "last_lap": last_lap_display,
                     "total_time": total_time_display,
-                    "finish_time_formatted": total_time_display  # Add this as backup
+                    "racer_total_time": racer_total_time,  # NEW - actual race time
+                    "finish_time_formatted": total_time_display
                 })
-                
-                # Copy lap times data
+
+            # Copy lap times data with race mode support
                 lap_times = racer["lap_times_raw"]
                 for i, lap_time in enumerate(lap_times):
                     lap_num = i + 1
                     
-                    # Calculate individual lap time
+                    # Calculate individual lap time based on race mode
                     if i == 0:
-                        individual_lap = lap_time
+                        if shared_state.race_mode == shared_state.RACE_MODE_START_LINE and racer.get("start_time") is not None:
+                            individual_lap = lap_time - racer["start_time"]
+                        elif shared_state.race_mode == shared_state.RACE_MODE_ROLLING and racer.get("rolling_start_time") is not None:
+                            individual_lap = lap_time - racer["rolling_start_time"]
+                        else:
+                            individual_lap = lap_time
                     else:
                         individual_lap = lap_time - lap_times[i-1]
                     

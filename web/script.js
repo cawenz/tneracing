@@ -168,6 +168,15 @@ function updateLapTimes(data) {
     if (data.lap_times) console.log("Dedicated lap_times array length:", data.lap_times.length);
     if (data.racers) console.log("Racers array length:", data.racers.length);
 }
+// Update the race mode
+function updateRaceMode(data) {
+    const raceModeElement = document.getElementById('race-mode');
+    if (data.race_mode_display) {
+        raceModeElement.textContent = `Race Mode: ${data.race_mode_display}`;
+    } else {
+        raceModeElement.textContent = 'Race Mode: Not Set';
+    }
+}
 // Format time with hours for the main race timer
 function formatTime(seconds) {
     if (typeof seconds !== 'number' || seconds < 0) return '0:00:00.000';
@@ -248,6 +257,7 @@ function fetchRaceData() {
             // Update the UI components
             updateStatus(data.active);
             updateTimer(data.elapsed_formatted);
+            updateRaceMode(data); 
             updateStandings(data.racers);
             
             // Pass the complete data object to updateLapTimes

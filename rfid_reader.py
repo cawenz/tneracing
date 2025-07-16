@@ -33,10 +33,8 @@ def process_tag_data(tag_data):
         else:
             tag_id = str(epc_data).lower()
         
-        # After tag_id is extracted
         logger.info(f"Extracted tag_id: {tag_id}, race_active: {shared_state.race_active}, in allowed tags: {tag_id in shared_state.ALLOWED_TAGS}")
         
-        # This is the key part that directly processes the tag like in the original code
         if shared_state.race_active and (not shared_state.ALLOWED_TAGS or tag_id in shared_state.ALLOWED_TAGS):
             current_time = time.time()
             if tag_id in shared_state.last_read_times and \
@@ -49,91 +47,86 @@ def process_tag_data(tag_data):
             rssi = tag_data.get('PeakRSSI', 0)
             logger.info(f"Read tag: {tag_id} on antenna {antenna} with RSSI {rssi}")
             
-            # Direct processing in the same thread without using tkinter after()
             if tag_id in shared_state.racers_data:
                 racer = shared_state.racers_data[tag_id]
                 lap_time = current_time - shared_state.race_start_time
                 
-                # Track if this is the first lap for this racer
-                first_lap_for_racer = racer.get("laps", 0) == 0
-                
-                # FIXED: Check if racer has already completed the required laps
-                if racer["laps"] < shared_state.num_laps:
-                    # Update lap information
-                    racer["lap_times"].append(lap_time)
+                # Handle different race modes
+                if shared_state.race_mode == shared_state.RACE_MODE_START_LINE:
+                    # Start Line Race Mode Logic
+                    if not racer["has_started"]:
+                        # First read - record start time but don't count as lap
+                        racer["start_time"] = lap_time
+                        racer["has_started"] = True
+                        logger.info(f"Racer {racer['name']} crossed start line at {lap_time:.2f}s")
+                        return  # Don't process further for start line crossing
+                    
+                    # Check delay since last read (start time or last lap)
+                    last_time = racer["lap_times"][-1] if racer["lap_times"] else racer["start_time"]
+                    if lap_time - last_time < shared_state.DELAY_SECONDS:
+                        logger.debug(f"Ignoring too fast lap for {racer['name']} (ID: {tag_id})")
+                        return
+                        
+                    # This is a legitimate lap completion
                     racer["laps"] += 1
-                    logger.info(f"Racer {racer['name']} completed lap {racer['laps']} in {lap_time:.2f}s")
+                    racer["lap_times"].append(lap_time)
                     
-                    # Check if racer finished the race
-                    if racer["laps"] >= shared_state.num_laps and not racer["finished"]:
-                        racer["finished"] = True
-                        racer["finish_time"] = lap_time
-                        
-                        # Calculate position
-                        position = 1
-                        for r in shared_state.racers_data.values():
-                            if r["finished"] and r != racer:
-                                position += 1
-                        racer["position"] = position
-                        logger.info(f"Racer {racer['name']} finished in position {position}")
                 else:
-                    # Racer has already completed the required number of laps
-                    logger.debug(f"Ignoring lap for {racer['name']} - already completed {shared_state.num_laps} laps")
-                
-                # RESTORE UI UPDATE - but use a simple flag-based approach
-                # This ensures the UI gets updated when tags are processed
-                if _monitor_ref and hasattr(_monitor_ref, 'root'):
-                    try:
-                        # Use a simple lambda to avoid method resolution issues
-                        _monitor_ref.root.after_idle(lambda: None)  # Just trigger the main thread
-                    except Exception as e:
-                        logger.debug(f"Could not trigger UI update: {e}")
-                
-                # COMPLETELY REVISED LOGIC FOR RACE ENDING:
-                # 1. If this racer just started their first lap, definitely don't end the race
-                # 2. Check if any racers have 0 laps - if so, continue the race
-                # 3. If all racers have started, check if all have finished their required laps
-                
-                # If this was the first lap for this racer, don't check for race ending
-                if first_lap_for_racer:
-                    logger.info(f"Racer {racer['name']} just started - race continues")
-                else:
-                    # Check if there are still racers who haven't started
-                    any_racers_not_started = False
-                    for tag in shared_state.ALLOWED_TAGS:
-                        if tag in shared_state.racers_data:
-                            r = shared_state.racers_data[tag]
-                            if r.get("laps", 0) == 0:
-                                any_racers_not_started = True
-                                logger.debug(f"Racer {r.get('name', 'Unknown')} has not started yet")
-                                break
+                    # Rolling Start Mode Logic - CORRECTED
+                    if not racer["has_started"]:
+                        # First read - this is the START of lap 1
+                        racer["rolling_start_time"] = lap_time
+                        racer["has_started"] = True
+                        logger.info(f"Racer {racer['name']} started lap 1 at {lap_time:.2f}s (rolling start)")
+                        return  # Don't count this as a completed lap yet
                     
-                    # If there are racers who haven't started, don't end the race
-                    if any_racers_not_started:
-                        logger.info("Some racers haven't started yet - race continues")
+                    # Check delay since last read
+                    last_time = racer["lap_times"][-1] if racer["lap_times"] else racer["rolling_start_time"]
+                    if lap_time - last_time < shared_state.DELAY_SECONDS:
+                        logger.debug(f"Ignoring too fast lap for {racer['name']} (ID: {tag_id})")
+                        return
+                    
+                    # This is a lap completion
+                    racer["laps"] += 1
+                    racer["lap_times"].append(lap_time)
+
+                logger.info(f"Racer {racer['name']} completed lap {racer['laps']} at {lap_time:.2f}s")
+                
+                # Check if racer finished the race
+                if racer["laps"] >= shared_state.num_laps and not racer["finished"]:
+                    racer["finished"] = True
+                    
+                    # Calculate finish time based on race mode
+                    if shared_state.race_mode == shared_state.RACE_MODE_ROLLING:
+                        # For rolling start, total time is from first tag read to last lap completion
+                        racer["finish_time"] = lap_time - racer["rolling_start_time"]
                     else:
-                        # All racers have started, check if ALL have finished their required laps
-                        all_racers_finished = True
-                        for tag in shared_state.ALLOWED_TAGS:
-                            if tag in shared_state.racers_data:
-                                r = shared_state.racers_data[tag]
-                                # A racer is not finished if they haven't completed all required laps
-                                if r.get("laps", 0) < shared_state.num_laps:
-                                    all_racers_finished = False
-                                    logger.debug(f"Racer {r.get('name', 'Unknown')} has not finished all laps")
-                                    break
-                        
-                        if all_racers_finished and shared_state.race_active:
-                            logger.info("All racers have completed all required laps - ending race")
-                            if _monitor_ref and hasattr(_monitor_ref, 'root'):
-                                try:
-                                    _monitor_ref.root.after(0, _monitor_ref.stop_race)
-                                except Exception as e:
-                                    logger.error(f"Could not stop race: {e}")
+                        # For start line, total time is from start line to last lap completion
+                        racer["finish_time"] = lap_time - racer["start_time"]
+                    
+                    # Calculate position
+                    position = 1
+                    for r in shared_state.racers_data.values():
+                        if r["finished"] and r != racer:
+                            position += 1
+                    racer["position"] = position
+                    logger.info(f"Racer {racer['name']} finished in position {position} with total time {racer['finish_time']:.2f}s")
+                
+                # Check for race ending - only if all racers have started
+                if not any(not r.get("has_started", False) for r in shared_state.racers_data.values()):
+                    # All racers have started, check if all have finished
+                    if all(r.get("laps", 0) >= shared_state.num_laps for r in shared_state.racers_data.values()) and shared_state.race_active:
+                        logger.info("All racers have completed all required laps - ending race")
+                        if _monitor_ref and hasattr(_monitor_ref, 'root'):
+                            try:
+                                _monitor_ref.root.after(0, _monitor_ref.stop_race)
+                            except Exception as e:
+                                logger.error(f"Could not stop race: {e}")
         else:
             logger.debug(f"Ignoring tag: {tag_id} (not in allowed list or race not active)")
     except Exception as e:
         logger.error(f"Error processing tag data: {e}", exc_info=True)
+
 
 def tag_seen_callback(reader, tags):
     """Callback function for tag reports - will be called by the reader client"""

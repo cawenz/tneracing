@@ -150,6 +150,32 @@ class RFIDTagMonitor:
         self.set_laps_btn = ttk.Button(lap_frame, text="Set Laps", command=self.set_laps)
         self.set_laps_btn.pack(side=tk.LEFT, padx=5)
 
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Race Mode 
+        race_mode_frame = tk.Frame(top_controls_frame, bg=UNIFIED_BG)
+        race_mode_frame.pack(side=tk.LEFT)
+        
+        tk.Label(race_mode_frame, text="Race Mode:", bg=UNIFIED_BG, font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 5))
+        self.race_mode_var = tk.StringVar(value=shared_state.RACE_MODE_START_LINE)
+        self.race_mode_combo = ttk.Combobox(race_mode_frame, textvariable=self.race_mode_var, 
+                                           values=[shared_state.RACE_MODE_START_LINE, shared_state.RACE_MODE_ROLLING],
+                                           state="readonly", width=12)
+        self.race_mode_combo.pack(side=tk.LEFT, padx=(0, 5))
+        self.race_mode_combo.bind('<<ComboboxSelected>>', self.on_race_mode_change)
+        
+        self.set_mode_btn = ttk.Button(race_mode_frame, text="Set Mode", command=self.set_race_mode)
+        self.set_mode_btn.pack(side=tk.LEFT, padx=5)
+
+        # Race mode description
+        mode_desc_frame = tk.Frame(setup_content, bg=UNIFIED_BG)
+        mode_desc_frame.pack(fill=tk.X, pady=(5, 10))
+        
+        self.mode_description = tk.Label(mode_desc_frame, 
+                                        text="Start Line Race: First tag read = start time (not lap 1). Second read = lap 1.", 
+                                        font=("Arial", 9, "italic"), fg="#666", bg=UNIFIED_BG, wraplength=600)
+        self.mode_description.pack(anchor=tk.W)
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Racer selection section
         racer_selection_frame = tk.Frame(setup_content, bg=UNIFIED_BG)
         racer_selection_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 5))
@@ -449,6 +475,9 @@ class RFIDTagMonitor:
                 "name": f"{selected_racer.get('first_name', '')} {selected_racer.get('last_name', '')}",
                 "laps": 0,
                 "lap_times": [],
+                "start_time": None,  # For start line race mode
+                "rolling_start_time": None,  # NEW: For rolling start mode
+                "has_started": False,  # Track if racer has crossed start line
                 "finished": False,
                 "position": 0,
                 "finish_time": 0
@@ -512,7 +541,8 @@ class RFIDTagMonitor:
             self.lap_var.set(str(shared_state.num_laps))
             
         num_racers = len(shared_state.ALLOWED_TAGS)
-        self.race_info_label.config(text=f"{num_racers} racers, {shared_state.num_laps} laps")
+        mode_name = "Start Line" if shared_state.race_mode == shared_state.RACE_MODE_START_LINE else "Rolling"
+        self.race_info_label.config(text=f"{num_racers} racers, {shared_state.num_laps} laps ({mode_name})")
 
     def update_selected_racers(self, selected_racers_list):
         """Legacy method - no longer used with new UI"""
@@ -702,12 +732,15 @@ class RFIDTagMonitor:
             self.lap_times_tree.delete(item)
 
         # Reset all racer data
-        for tag in shared_state.racers_data:   # Use shared_state
+        for tag in shared_state.racers_data:
             shared_state.racers_data[tag]["laps"] = 0
             shared_state.racers_data[tag]["lap_times"] = []
+            shared_state.racers_data[tag]["start_time"] = None
+            shared_state.racers_data[tag]["rolling_start_time"] = None  # NEW
+            shared_state.racers_data[tag]["has_started"] = False
             shared_state.racers_data[tag]["finished"] = False
             shared_state.racers_data[tag]["position"] = 0
-            shared_state.racers_data[tag]["finish_time"] = 0  
+            shared_state.racers_data[tag]["finish_time"] = 0
 
         # Update UI state
         self.start_button.config(state=tk.DISABLED)  
@@ -717,7 +750,10 @@ class RFIDTagMonitor:
         # Disable race setup during race
         self.add_racer_btn.config(state=tk.DISABLED)
         self.remove_racer_btn.config(state=tk.DISABLED)
-        
+        # ~~~~~~~~
+        self.race_mode_combo.config(state=tk.DISABLED)
+        self.set_mode_btn.config(state=tk.DISABLED)
+
         self.update_status(f"Race started! {len(shared_state.ALLOWED_TAGS)} racers, {shared_state.num_laps} laps")  
         self.race_timer.start()  
         
@@ -747,6 +783,10 @@ class RFIDTagMonitor:
         
         self.update_status("Race stopped")  
         
+        #~~~~~~~~~~~~~
+        self.race_mode_combo.config(state="readonly")
+        self.set_mode_btn.config(state=tk.NORMAL)
+
         # Prompt to export results
         self.results_exporter.prompt_export_results()
 
@@ -915,8 +955,17 @@ class RFIDTagMonitor:
                 current_position = i + 1
                     
                 # The time displayed is the total elapsed time of their last completed lap
-                last_lap_time = racer['lap_times'][-1] if racer['lap_times'] else 0
-                total_time = self.race_timer.format_total_time(last_lap_time)
+                if shared_state.race_mode == shared_state.RACE_MODE_ROLLING and racer.get("rolling_start_time") is not None:
+                    # For rolling start, show time from first tag read
+                    if racer['lap_times']:
+                        display_time = racer['lap_times'][-1] - racer["rolling_start_time"]
+                        total_time = self.race_timer.format_total_time(display_time)
+                    else:
+                        total_time = "-"
+                else:
+                    # For start line mode or no rolling start time, use the standard calculation
+                    last_lap_time = racer['lap_times'][-1] if racer['lap_times'] else 0
+                    total_time = self.race_timer.format_total_time(last_lap_time)
                     
                 # Calculate gap from leader
                 gap = "Leader"
@@ -933,27 +982,38 @@ class RFIDTagMonitor:
                 # Calculate best lap time
                 best_lap_time = "N/A"
                 best_lap_value = 0
-                if len(racer["lap_times"]) > 1:
+                if len(racer["lap_times"]) > 0:
                     lap_durations = []
-                    for j in range(len(racer["lap_times"])):
-                        if j == 0:
-                            lap_durations.append(racer["lap_times"][0])
-                        else:
+                    if shared_state.race_mode == shared_state.RACE_MODE_START_LINE:
+                        # First lap duration from start_time to first lap_time
+                        if racer.get("start_time") is not None and racer["lap_times"]:
+                            lap_durations.append(racer["lap_times"][0] - racer["start_time"])
+                        # Subsequent laps
+                        for j in range(1, len(racer["lap_times"])):
+                            lap_durations.append(racer["lap_times"][j] - racer["lap_times"][j-1])
+                    else:
+                        # Rolling start mode
+                        if racer.get("rolling_start_time") is not None and racer["lap_times"]:
+                            lap_durations.append(racer["lap_times"][0] - racer["rolling_start_time"])
+                        # Subsequent laps
+                        for j in range(1, len(racer["lap_times"])):
                             lap_durations.append(racer["lap_times"][j] - racer["lap_times"][j-1])
                             
-                    best_lap_value = min(lap_durations)
-                    best_lap_time = f"{best_lap_value:.3f}"
-                elif racer["lap_times"]:
-                    best_lap_value = racer['lap_times'][0]
-                    best_lap_time = f"{best_lap_value:.3f}"
-                    
+                    if lap_durations:
+                        best_lap_value = min(lap_durations)
+                        best_lap_time = f"{best_lap_value:.3f}"
                 # Calculate last lap time
                 last_lap_time_value = 0
                 if len(racer["lap_times"]) > 1:
                     last_lap_time_value = racer["lap_times"][-1] - racer["lap_times"][-2]
                     last_lap_time = f"{last_lap_time_value:.3f}"
                 elif racer["lap_times"]:
-                    last_lap_time_value = racer['lap_times'][0]
+                    if shared_state.race_mode == shared_state.RACE_MODE_START_LINE and racer.get("start_time"):
+                        last_lap_time_value = racer['lap_times'][0] - racer["start_time"]
+                    elif shared_state.race_mode == shared_state.RACE_MODE_ROLLING and racer.get("rolling_start_time"):
+                        last_lap_time_value = racer['lap_times'][0] - racer["rolling_start_time"]
+                    else:
+                        last_lap_time_value = racer['lap_times'][0]
                     last_lap_time = f"{last_lap_time_value:.3f}"
                 else:
                     last_lap_time = "N/A"
@@ -995,11 +1055,26 @@ class RFIDTagMonitor:
                     lap_num = i + 1
                     
                     # Calculate individual lap duration
+                    # Calculate individual lap duration based on race mode
+                if shared_state.race_mode == shared_state.RACE_MODE_START_LINE:
                     if i == 0:
-                        individual_lap_duration = lap_time
+                        # First lap from start_time to first lap_time
+                        if racer.get("start_time") is not None:
+                            individual_lap_duration = lap_time - racer["start_time"]
+                        else:
+                            individual_lap_duration = lap_time
                     else:
                         individual_lap_duration = lap_time - racer['lap_times'][i-1]
-                        
+                else:
+                # Rolling start mode
+                    if i == 0:
+                # First lap from rolling_start_time to first lap completion
+                        if racer.get("rolling_start_time") is not None:
+                            individual_lap_duration = lap_time - racer["rolling_start_time"]
+                        else:
+                            individual_lap_duration = lap_time
+                    else:
+                        individual_lap_duration = lap_time - racer['lap_times'][i-1]
                     # Format times for output
                     formatted_lap_duration = f"{individual_lap_duration:.3f}"
                     formatted_total_elapsed_time = self.race_timer.format_total_time(lap_time)
@@ -1138,7 +1213,23 @@ class RFIDTagMonitor:
             self.root.clipboard_clear()
             self.root.clipboard_append(url)
             self.update_status(f"URL copied to clipboard: {url}")
+# ~~~~~~~~~~~~~~~~~~~~~~~~ Race Mode Selection ~~~~~~~~~~~
+    def on_race_mode_change(self, event=None):
+        """Update mode description when race mode changes"""
+        mode = self.race_mode_var.get()
+        if mode == shared_state.RACE_MODE_START_LINE:
+            self.mode_description.config(text="Start Line Race: First tag read = start time (not lap 1). Second read = lap 1.")
+        else:  # rolling start
+            self.mode_description.config(text="Rolling Start: First tag read = lap 1 start. Second read = lap 1 end. Total time from first read.")
 
+    def set_race_mode(self):
+        """Set the race mode and update shared state"""
+        new_mode = self.race_mode_var.get()
+        shared_state.race_mode = new_mode
+        self.on_race_mode_change()  # Update description
+        mode_name = "Start Line Race" if new_mode == shared_state.RACE_MODE_START_LINE else "Rolling Start"
+        self.update_status(f"Race mode set to: {mode_name}")
+        logger.info(f"Race mode set to: {new_mode}")
 
 if __name__ == "__main__":
     try:

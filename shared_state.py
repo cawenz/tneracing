@@ -12,3 +12,8 @@ num_laps = DEFAULT_NUM_LAPS # From config
 reader_connected = False 
 reader_client = None # Instance of LLRPReaderClient [1] (can be managed locally within rfid_reader.py too)
 DELAY_SECONDS = 5
+
+# Race mode settings
+RACE_MODE_START_LINE = "start_line"
+RACE_MODE_ROLLING = "rolling"
+race_mode = RACE_MODE_START_LINE  # Default to start line race mode
