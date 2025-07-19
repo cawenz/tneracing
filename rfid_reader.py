@@ -49,6 +49,12 @@ def process_tag_data(tag_data):
             
             if tag_id in shared_state.racers_data:
                 racer = shared_state.racers_data[tag_id]
+                
+                # IMPORTANT FIX: Check if racer has already finished - if so, ignore further reads
+                if racer.get("finished", False):
+                    logger.debug(f"Ignoring tag read for finished racer {racer['name']} (ID: {tag_id})")
+                    return
+                
                 lap_time = current_time - shared_state.race_start_time
                 
                 # Handle different race modes
@@ -92,7 +98,7 @@ def process_tag_data(tag_data):
 
                 logger.info(f"Racer {racer['name']} completed lap {racer['laps']} at {lap_time:.2f}s")
                 
-                # Check if racer finished the race
+                # Check if racer finished the race - MOVED BEFORE race ending check
                 if racer["laps"] >= shared_state.num_laps and not racer["finished"]:
                     racer["finished"] = True
                     
@@ -115,8 +121,8 @@ def process_tag_data(tag_data):
                 # Check for race ending - only if all racers have started
                 if not any(not r.get("has_started", False) for r in shared_state.racers_data.values()):
                     # All racers have started, check if all have finished
-                    if all(r.get("laps", 0) >= shared_state.num_laps for r in shared_state.racers_data.values()) and shared_state.race_active:
-                        logger.info("All racers have completed all required laps - ending race")
+                    if all(r.get("finished", False) for r in shared_state.racers_data.values()) and shared_state.race_active:
+                        logger.info("All racers have finished the race - ending race")
                         if _monitor_ref and hasattr(_monitor_ref, 'root'):
                             try:
                                 _monitor_ref.root.after(0, _monitor_ref.stop_race)

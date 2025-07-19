@@ -1050,31 +1050,32 @@ class RFIDTagMonitor:
                 ))
                 
             # Populate the Lap Times Tree with Lap Times
+            # Populate the Lap Times Tree with Lap Times
             for racer in racers_in_progress:
                 for i, lap_time in enumerate(racer['lap_times']):
                     lap_num = i + 1
                     
-                    # Calculate individual lap duration
                     # Calculate individual lap duration based on race mode
-                if shared_state.race_mode == shared_state.RACE_MODE_START_LINE:
-                    if i == 0:
-                        # First lap from start_time to first lap_time
-                        if racer.get("start_time") is not None:
-                            individual_lap_duration = lap_time - racer["start_time"]
+                    if shared_state.race_mode == shared_state.RACE_MODE_START_LINE:
+                        if i == 0:
+                            # First lap from start_time to first lap_time
+                            if racer.get("start_time") is not None:
+                                individual_lap_duration = lap_time - racer["start_time"]
+                            else:
+                                individual_lap_duration = lap_time
                         else:
-                            individual_lap_duration = lap_time
+                            individual_lap_duration = lap_time - racer['lap_times'][i-1]
                     else:
-                        individual_lap_duration = lap_time - racer['lap_times'][i-1]
-                else:
-                # Rolling start mode
-                    if i == 0:
-                # First lap from rolling_start_time to first lap completion
-                        if racer.get("rolling_start_time") is not None:
-                            individual_lap_duration = lap_time - racer["rolling_start_time"]
+                        # Rolling start mode
+                        if i == 0:
+                            # First lap from rolling_start_time to first lap completion
+                            if racer.get("rolling_start_time") is not None:
+                                individual_lap_duration = lap_time - racer["rolling_start_time"]
+                            else:
+                                individual_lap_duration = lap_time
                         else:
-                            individual_lap_duration = lap_time
-                    else:
-                        individual_lap_duration = lap_time - racer['lap_times'][i-1]
+                            individual_lap_duration = lap_time - racer['lap_times'][i-1]
+                    
                     # Format times for output
                     formatted_lap_duration = f"{individual_lap_duration:.3f}"
                     formatted_total_elapsed_time = self.race_timer.format_total_time(lap_time)
