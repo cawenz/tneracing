@@ -884,20 +884,22 @@ class RFIDTagMonitor:
     def on_close(self):
         """Handle window close event"""
         logger.info("Window close requested, shutting down...")  
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        # Stop web server if running
         if self.web_server_running:
             stop_server()
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        shared_state.stop_event.set()   # Signal the reader thread to stop via shared_state
-        self.root.destroy()  
-        # Try to stop the Twisted reactor if it's still running (it runs in reader thread)  
-        try:
-            from twisted.internet import reactor # Import here to avoid circular dependency
-            if reactor.running:  
-                reactor.stop()
-        except:
-            pass
-
+            
+        # Stop the reader if connected
+        if shared_state.reader_connected or (hasattr(self, '_reader_thread') and self._reader_thread and self._reader_thread.is_alive()):
+            disconnect_rfid_reader()
+            
+            # Wait a bit for clean shutdown
+            if hasattr(self, '_reader_thread') and self._reader_thread:
+                self._reader_thread.join(timeout=3.0)
+        
+        self.root.destroy()
+        logger.info("Application shutdown complete")
+        
     def update_results(self):
         """Update the race results display"""
         try:
