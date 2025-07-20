@@ -37,13 +37,45 @@ def process_tag_data(tag_data):
             logger.warning("No EPC data in tag")
             return
         
-        # Convert to string if needed
-        if isinstance(epc, bytes):
-            tag_id = epc.hex().lower()
-        else:
-            tag_id = str(epc).lower()
+        logger.info(f"Raw EPC data: {epc} (type: {type(epc)})")  # DEBUG
         
-        logger.info(f"Read tag: {tag_id}, race_active: {shared_state.race_active}")
+        # Convert to consistent hex string format
+        if isinstance(epc, bytes):
+            # Raw bytes - try to decode as ASCII first, then fall back to hex
+            try:
+                # Try to decode as ASCII (this is what we want for your tags)
+                tag_id = epc.decode('ascii').lower()
+                logger.info(f"Decoded bytes as ASCII: {tag_id}")  # DEBUG
+            except UnicodeDecodeError:
+                # If ASCII decode fails, convert to hex
+                tag_id = epc.hex().lower()
+                logger.info(f"Converted bytes to hex: {tag_id}")  # DEBUG
+        else:
+            # String data - check if it's ASCII-encoded hex
+            epc_str = str(epc).lower()
+            logger.info(f"EPC as string: {epc_str} (length: {len(epc_str)})")  # DEBUG
+            
+            # Check if this looks like ASCII-encoded hex (double the expected length)
+            if len(epc_str) == 48 and all(c in '0123456789abcdef' for c in epc_str):
+                logger.info("EPC matches ASCII-encoded hex criteria, converting...")  # DEBUG
+                try:
+                    # This is ASCII-encoded hex - convert it back
+                    decoded_bytes = bytes.fromhex(epc_str)
+                    logger.info(f"Decoded bytes: {decoded_bytes}")  # DEBUG
+                    # Decode the bytes as ASCII to get the original hex string
+                    tag_id = decoded_bytes.decode('ascii').lower()
+                    logger.info(f"Converted ASCII-encoded hex: {epc_str} -> {tag_id}")  # DEBUG
+                except Exception as e:
+                    logger.warning(f"Failed to convert ASCII-encoded hex: {e}")
+                    tag_id = epc_str
+            else:
+                logger.info("EPC does not match ASCII-encoded hex criteria, using as-is")  # DEBUG
+                # Normal hex string (or other format)
+                tag_id = epc_str
+        
+        logger.info(f"Final tag_id: {tag_id}")  # DEBUG
+        logger.info(f"Read tag: {tag_id} (converted), race_active: {shared_state.race_active}, in allowed tags: {tag_id in shared_state.ALLOWED_TAGS}")
+        logger.info(f"Current ALLOWED_TAGS: {shared_state.ALLOWED_TAGS}")  # DEBUG
         
         # Only process if race is active and tag is allowed
         if not shared_state.race_active:
@@ -52,6 +84,7 @@ def process_tag_data(tag_data):
             
         if shared_state.ALLOWED_TAGS and tag_id not in shared_state.ALLOWED_TAGS:
             logger.debug(f"Ignoring tag: {tag_id} (not in allowed list)")
+            logger.debug(f"Allowed tags are: {shared_state.ALLOWED_TAGS}")
             return
             
         # Check timing to prevent duplicate reads

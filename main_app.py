@@ -444,6 +444,8 @@ class RFIDTagMonitor:
 
     def add_racer_to_race(self):
         """Add selected racer to the race"""
+        logger.info("add_racer_to_race() called")  # DEBUG
+        
         selected_items = self.available_racers_tree.selection()
         if not selected_items:
             messagebox.showwarning("No Selection", "Please select a racer to add to the race.")
@@ -452,6 +454,8 @@ class RFIDTagMonitor:
         # Get selected racer info
         item = selected_items[0]
         name, tag = self.available_racers_tree.item(item, 'values')
+        
+        logger.info(f"Selected racer: name='{name}', tag='{tag}'")  # DEBUG
         
         # Find the full racer data
         all_racers = self.racer_manager.get_all_racers()
@@ -465,10 +469,17 @@ class RFIDTagMonitor:
             messagebox.showerror("Error", "Could not find racer data.")
             return
             
+        logger.info(f"Found racer data: {selected_racer}")  # DEBUG
+        
         # Add to race
         tag_normalized = str(selected_racer.get('tag', '')).strip().lower()
+        logger.info(f"Tag normalized: '{tag_normalized}'")  # DEBUG
+        logger.info(f"Current ALLOWED_TAGS before adding: {shared_state.ALLOWED_TAGS}")  # DEBUG
+        
         if tag_normalized not in shared_state.ALLOWED_TAGS:
             shared_state.ALLOWED_TAGS.append(tag_normalized)
+            logger.info(f"Added tag to ALLOWED_TAGS: '{tag_normalized}'")  # DEBUG
+            logger.info(f"ALLOWED_TAGS now contains: {shared_state.ALLOWED_TAGS}")  # DEBUG
             
             # Initialize racer data
             shared_state.racers_data[tag_normalized] = {
@@ -483,6 +494,8 @@ class RFIDTagMonitor:
                 "finish_time": 0
             }
             
+            logger.info(f"Added racer data for '{tag_normalized}': {shared_state.racers_data[tag_normalized]}")  # DEBUG
+            
             # Update UI
             self.refresh_race_roster()
             self.refresh_racer_list()
@@ -491,6 +504,10 @@ class RFIDTagMonitor:
             # Update start button state
             if shared_state.reader_connected and shared_state.ALLOWED_TAGS:
                 self.start_button.config(state=tk.NORMAL)
+                
+            logger.info("Successfully added racer to race")  # DEBUG
+        else:
+            logger.warning(f"Tag '{tag_normalized}' already in ALLOWED_TAGS")  # DEBUG
 
     def remove_racer_from_race(self):
         """Remove selected racer from the race"""
@@ -899,7 +916,7 @@ class RFIDTagMonitor:
         
         self.root.destroy()
         logger.info("Application shutdown complete")
-        
+
     def update_results(self):
         """Update the race results display"""
         try:
