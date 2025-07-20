@@ -43,8 +43,10 @@ def update_race_data_cache():
                 "elapsed": elapsed,
                 "elapsed_formatted": RaceTimer.format_time(elapsed),
                 "target_laps": shared_state.num_laps,
-                "race_mode": shared_state.race_mode,  # NEW
-                "race_mode_display": "Start Line Race" if shared_state.race_mode == shared_state.RACE_MODE_START_LINE else "Rolling Start",  # NEW
+                "race_mode": shared_state.race_mode, 
+                "race_name": shared_state.race_name or "Unnamed Race", 
+                "race_datetime": shared_state.race_start_datetime.strftime("%Y-%m-%d %H:%M:%S") if shared_state.race_start_datetime else None, 
+                "race_mode_display": "Start Line Race" if shared_state.race_mode == shared_state.RACE_MODE_START_LINE else "Rolling Start", 
                 "racers": [],
                 "lap_times": []
             }
@@ -52,15 +54,20 @@ def update_race_data_cache():
             # Copy racer data (avoid direct shared_state access in handler thread)
             racers_list = []
             for racer_id, racer in shared_state.racers_data.items():
+                # FIX: Get the actual racer data from shared_state, not the processed list
+                actual_racer = shared_state.racers_data[racer_id]
                 racers_list.append({
                     "id": racer_id,
-                    "name": racer.get("name", "Unknown"),
-                    "laps": racer.get("laps", 0),
-                    "position": racer.get("position", 0),
-                    "lap_times_raw": racer.get("lap_times", []),
-                    "calculated_gap": racer.get("calculated_gap", "-"),
-                    "best_lap_raw": racer.get("best_lap", 0),
-                    "last_lap_raw": racer.get("last_lap", 0)
+                    "name": actual_racer.get("name", "Unknown"),
+                    "laps": actual_racer.get("laps", 0),
+                    "position": actual_racer.get("position", 0),
+                    "lap_times_raw": actual_racer.get("lap_times", []),
+                    "calculated_gap": actual_racer.get("calculated_gap", "-"),
+                    "best_lap_raw": actual_racer.get("best_lap", 0),
+                    "last_lap_raw": actual_racer.get("last_lap", 0),
+                    "finished": actual_racer.get("finished", False),
+                    "start_time": actual_racer.get("start_time"),
+                    "rolling_start_time": actual_racer.get("rolling_start_time")
                 })
             
             # Sort racers by position for consistent display
@@ -114,7 +121,7 @@ def update_race_data_cache():
                     "finish_time_formatted": total_time_display
                 })
 
-            # Copy lap times data with race mode support
+                # Copy lap times data with race mode support
                 lap_times = racer["lap_times_raw"]
                 for i, lap_time in enumerate(lap_times):
                     lap_num = i + 1

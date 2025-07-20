@@ -29,7 +29,7 @@ def set_monitor_reference(monitor_instance):
     _monitor_ref = monitor_instance
 
 def process_tag_data(tag_data):
-    """Process tag data from the reader"""
+    """Process tag data from the reader - UPDATED with start speed functionality"""
     try:
         # Extract EPC from tag data (new sllurp format)
         epc = tag_data.get('EPC', None)
@@ -109,12 +109,13 @@ def process_tag_data(tag_data):
             
             # Handle different race modes
             if shared_state.race_mode == shared_state.RACE_MODE_START_LINE:
-                # Start Line Race Mode Logic
+                # START LINE RACE MODE LOGIC
                 if not racer["has_started"]:
-                    # First read - record start time but don't count as lap
+                    # First read - record start time AND start speed but don't count as lap
                     racer["start_time"] = lap_time
+                    racer["start_speed"] = lap_time  # NEW: Record start speed (time from race start to first tag read)
                     racer["has_started"] = True
-                    logger.info(f"Racer {racer['name']} crossed start line at {lap_time:.2f}s")
+                    logger.info(f"Racer {racer['name']} crossed start line at {lap_time:.2f}s (start speed: {lap_time:.3f}s)")
                     return
                 
                 # Check delay since last read
@@ -127,12 +128,17 @@ def process_tag_data(tag_data):
                 racer["laps"] += 1
                 racer["lap_times"].append(lap_time)
                 
+                # Calculate individual lap time for logging
+                individual_lap_time = lap_time - racer["start_time"] if racer["laps"] == 1 else lap_time - racer["lap_times"][-2]
+                logger.info(f"Racer {racer['name']} completed lap {racer['laps']} in {individual_lap_time:.2f}s (total: {lap_time:.2f}s)")
+                
             else:
-                # Rolling Start Mode Logic
+                # ROLLING START MODE LOGIC (no start speed - they start at the reader)
                 if not racer["has_started"]:
                     # First read - this is the START of lap 1
                     racer["rolling_start_time"] = lap_time
                     racer["has_started"] = True
+                    racer["start_speed"] = None  # No start speed for rolling start
                     logger.info(f"Racer {racer['name']} started lap 1 at {lap_time:.2f}s (rolling start)")
                     return
                 
@@ -145,9 +151,11 @@ def process_tag_data(tag_data):
                 # This is a lap completion
                 racer["laps"] += 1
                 racer["lap_times"].append(lap_time)
+                
+                # Calculate individual lap time for logging
+                individual_lap_time = lap_time - racer["rolling_start_time"] if racer["laps"] == 1 else lap_time - racer["lap_times"][-2]
+                logger.info(f"Racer {racer['name']} completed lap {racer['laps']} in {individual_lap_time:.2f}s (total from rolling start: {lap_time - racer['rolling_start_time']:.2f}s)")
 
-            logger.info(f"Racer {racer['name']} completed lap {racer['laps']} at {lap_time:.2f}s")
-            
             # Check if racer finished the race
             if racer["laps"] >= shared_state.num_laps and not racer["finished"]:
                 racer["finished"] = True
@@ -164,7 +172,12 @@ def process_tag_data(tag_data):
                     if r["finished"] and r != racer:
                         position += 1
                 racer["position"] = position
+                
                 logger.info(f"Racer {racer['name']} finished in position {position} with total time {racer['finish_time']:.2f}s")
+                
+                # Log start speed for start line races
+                if shared_state.race_mode == shared_state.RACE_MODE_START_LINE and racer.get("start_speed") is not None:
+                    logger.info(f"Racer {racer['name']} start speed was {racer['start_speed']:.3f}s")
             
             # Check for race ending
             if not any(not r.get("has_started", False) for r in shared_state.racers_data.values()):

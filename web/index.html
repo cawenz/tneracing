@@ -9,18 +9,27 @@
 <body>
     <div class="container">
         <header>
-            <h1>Live Race Results</h1>
-            <div class="race-status">
-                <div id="status-indicator" class="status-indicator"></div>
-                <div id="race-status">Waiting for race to start</div>
+            <div class="header-top">
+                <h2 class="live-results">Live Results</h2>
             </div>
-            <div id="race-mode" class="race-mode">Race Mode: Not Set</div>  <!-- NEW -->
-            <div id="race-timer" class="race-timer">0:00:00.000</div>
+            
+            <div id="race-name" class="race-name">No Race Name Set</div>
+            <div id="race-timer" class="race-timer">0:00:00</div>
+            
+            <div class="header-bottom">
+                <div class="race-status">
+                    <div id="status-indicator" class="status-indicator"></div>
+                    <div id="race-status">Waiting for race to start</div>
+                </div>
+                <div id="race-mode" class="race-mode">Race Mode: Not Set</div>
+            </div>
         </header>
+        
         <div class="tabs">
             <button class="tab-button active" data-tab="standings">Current Standings</button>
             <button class="tab-button" data-tab="lap-times">Lap Times</button>
         </div>
+        
         <main>
             <div id="standings" class="tab-content active">
                 <table class="results-table">
@@ -50,8 +59,8 @@
                         <tr>
                             <th>Racer Name</th>
                             <th>Lap Number</th>
-                            <th>Lap Time</th> <!-- This will be individual lap time -->
-                            <th>Total Time</th> <!-- This will be cumulative time at lap completion -->
+                            <th>Lap Time</th>
+                            <th>Total Time</th>
                         </tr>
                     </thead>
                     <tbody id="lap-times-body">

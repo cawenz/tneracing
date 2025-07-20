@@ -7,12 +7,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import time
+from datetime import datetime  # ADD THIS LINE
 
-from config import logger, READER_IP, DEFAULT_NUM_LAPS # Import constants and logger from config [2, 52, 56]
-import shared_state # Import shared_state to access/modify global race data [5-7, 10, 12-19, 44]
+from config import logger, READER_IP, DEFAULT_NUM_LAPS
+import shared_state
 from race_timer import RaceTimer # Import RaceTimer class  
-from racer_manager import RacerManager # Import RacerManager class [1]
-from rfid_reader import start_rfid_reader, disconnect_rfid_reader, set_monitor_reference # Import reader functions [10, 62]
+from racer_manager import RacerManager # Import RacerManager class
+from rfid_reader import start_rfid_reader, disconnect_rfid_reader, set_monitor_reference # Import reader functions
 from data_exporter import RaceResultsExporter # Import RaceResultsExporter class  
 from web_server import start_server, stop_server, get_server_url
 
@@ -149,6 +150,29 @@ class RFIDTagMonitor:
         
         self.set_laps_btn = ttk.Button(lap_frame, text="Set Laps", command=self.set_laps)
         self.set_laps_btn.pack(side=tk.LEFT, padx=5)
+        # RACE NAME
+        race_name_frame = tk.Frame(setup_content, bg=UNIFIED_BG)
+        race_name_frame.pack(fill=tk.X, pady=(10, 5))
+        
+        tk.Label(race_name_frame, text="Race Name:", bg=UNIFIED_BG, font=("Arial", 10, "bold")).pack(anchor=tk.W)
+        
+        name_input_frame = tk.Frame(race_name_frame, bg=UNIFIED_BG)
+        name_input_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        self.race_name_var = tk.StringVar()
+        self.race_name_entry = ttk.Entry(name_input_frame, textvariable=self.race_name_var, width=30)
+        self.race_name_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        
+        self.set_race_name_btn = ttk.Button(name_input_frame, text="Set Name", command=self.set_race_name)
+        self.set_race_name_btn.pack(side=tk.LEFT, padx=(5, 0))
+        
+        self.generate_name_btn = ttk.Button(name_input_frame, text="Generate Random", command=self.generate_random_name)
+        self.generate_name_btn.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Display current race name
+        self.current_race_name_label = tk.Label(race_name_frame, text="Current: (No race name set)", 
+                                            font=("Arial", 9, "italic"), fg="#666", bg=UNIFIED_BG)
+        self.current_race_name_label.pack(anchor=tk.W, pady=(5, 0))
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Race Mode 
@@ -413,6 +437,7 @@ class RFIDTagMonitor:
 
         self.lap_times_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         lap_times_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    
     def update_race_status_indicator(self, racing=False):
         """Update the race status indicator color"""
         if racing:
@@ -488,6 +513,7 @@ class RFIDTagMonitor:
                 "lap_times": [],
                 "start_time": None,  # For start line race mode
                 "rolling_start_time": None,  # NEW: For rolling start mode
+                "start_speed": None,
                 "has_started": False,  # Track if racer has crossed start line
                 "finished": False,
                 "position": 0,
@@ -548,6 +574,42 @@ class RFIDTagMonitor:
             if tag in shared_state.racers_data:
                 racer = shared_state.racers_data[tag]
                 self.race_roster_tree.insert("", tk.END, values=(racer["name"], tag))
+    # Race name methods
+    def set_race_name(self):
+        """Set the race name"""
+        new_name = self.race_name_var.get().strip()
+        if not new_name:
+            messagebox.showwarning("Invalid Input", "Please enter a race name")
+            return
+        
+        shared_state.race_name = new_name
+        self.update_race_name_display()
+        self.update_status(f"Race name set to: {new_name}")
+        logger.info(f"Race name set to: {new_name}")
+
+    def generate_random_name(self):
+        """Generate and set a random race name"""
+        random_name = shared_state.generate_random_race_name()
+        self.race_name_var.set(random_name)
+        shared_state.race_name = random_name
+        self.update_race_name_display()
+        self.update_status(f"Generated race name: {random_name}")
+        logger.info(f"Generated random race name: {random_name}")
+
+    def update_race_name_display(self):
+        """Update the race name display"""
+        if shared_state.race_name:
+            self.current_race_name_label.config(text=f"Current: {shared_state.race_name}")
+        else:
+            self.current_race_name_label.config(text="Current: (No race name set)")
+
+
+
+
+
+
+
+
 
     def update_race_info(self):
         """Update the race info label"""
@@ -738,7 +800,16 @@ class RFIDTagMonitor:
         except ValueError:
             messagebox.showerror("Invalid Input", "Number of laps must be a number")
             return
+        
+        # NEW: Set race name if not already set
+        if not shared_state.race_name:
+            shared_state.race_name = shared_state.generate_random_race_name()
+            self.race_name_var.set(shared_state.race_name)
+            self.update_race_name_display()
+            logger.info(f"Auto-generated race name: {shared_state.race_name}")
 
+        
+        shared_state.race_start_datetime = datetime.now()
         shared_state.race_active = True   # Update shared_state
         shared_state.race_start_time = time.time()   # Update shared_state
 
@@ -776,7 +847,8 @@ class RFIDTagMonitor:
         
         # IMPORTANT: Start the update_results timer here
         self.update_results()
-
+        self.update_status(f"Race '{shared_state.race_name}' started! {len(shared_state.ALLOWED_TAGS)} racers, {shared_state.num_laps} laps")
+ 
     def stop_race(self):
         """Stop the race"""
         # Force one final update to show the final results BEFORE stopping the race
@@ -1207,9 +1279,13 @@ class RFIDTagMonitor:
         shared_state.ALLOWED_TAGS = []
         shared_state.racers_data = {}
         shared_state.num_laps = DEFAULT_NUM_LAPS
+        shared_state.race_name = None  # NEW: Clear race name
+        shared_state.race_start_datetime = None
         
         # Reset UI elements
         self.lap_var.set(str(DEFAULT_NUM_LAPS))
+        self.race_name_var.set("")
+        self.update_race_name_display()
         self.timer_display.config(text="00:00.00", fg="#2c3e50", font=("Consolas", 28, "bold"))
         self.update_race_status_indicator(racing=False)
         

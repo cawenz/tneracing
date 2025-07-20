@@ -25,7 +25,9 @@ function updateStatus(active) {
 }
 
 function updateTimer(elapsedFormatted) {
-    raceTimer.textContent = elapsedFormatted;
+    // Remove decimal places from the formatted time
+    const timeWithoutDecimals = elapsedFormatted.replace(/\.\d+$/, '');
+    raceTimer.textContent = timeWithoutDecimals;
 }
 
 function updateStandings(racers) {
@@ -177,6 +179,18 @@ function updateRaceMode(data) {
         raceModeElement.textContent = 'Race Mode: Not Set';
     }
 }
+
+// Update the race name
+function updateRaceName(raceName) {
+    const raceNameElement = document.getElementById('race-name');
+    if (raceName && raceName !== 'Unnamed Race') {
+        // Replace underscores with spaces and make it look nice
+        const displayName = raceName.replace(/_/g, ' ');
+        raceNameElement.textContent = displayName;
+    } else {
+        raceNameElement.textContent = 'No Race Name Set';
+    }
+}
 // Format time with hours for the main race timer
 function formatTime(seconds) {
     if (typeof seconds !== 'number' || seconds < 0) return '0:00:00.000';
@@ -257,6 +271,7 @@ function fetchRaceData() {
             // Update the UI components
             updateStatus(data.active);
             updateTimer(data.elapsed_formatted);
+            updateRaceName(data.race_name);  // ADD THIS LINE
             updateRaceMode(data); 
             updateStandings(data.racers);
             
