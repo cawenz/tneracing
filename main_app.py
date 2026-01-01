@@ -44,7 +44,7 @@ class RFIDTagMonitor:
     def setup_ui(self):
         """Setup the user interface with unified background and improved styling"""
         self.root.title("RFID Race Timer")  
-        self.root.geometry("1200x800")
+        self.root.geometry("1100x700")
         
         # Define unified color scheme
         UNIFIED_BG = "#f8f9fa"  # Light gray background for all frames

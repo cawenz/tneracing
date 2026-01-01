@@ -23,7 +23,8 @@ except ImportError:
 # --- Configuration Constant ---
 # It's better to keep configuration in one place. You can add this to your config.py
 # For now, we define it here.
-SERIAL_PORT = 'COM4'  # <<< IMPORTANT: Ensure this is your correct COM port
+#SERIAL_PORT = 'COM4'  # <<< IMPORTANT: Ensure this is your correct COM port
+SERIAL_PORT = '/dev/ttyUSB0'
 
 def scan_single_rfid_tag():
     """
